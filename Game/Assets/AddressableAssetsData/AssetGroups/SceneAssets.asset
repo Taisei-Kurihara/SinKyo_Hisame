@@ -15,11 +15,6 @@ MonoBehaviour:
   m_GroupName: SceneAssets
   m_GUID: af8e70dc19de9c242bce2808cb2da0fb
   m_SerializeEntries:
-  - m_GUID: 14e5c923e6ad9ae40948a3f57f31ab86
-    m_Address: StageSelect
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4223748dffbaa41408e16abd70a1f441
     m_Address: BaseHome
     m_ReadOnly: 0
@@ -32,6 +27,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 7bd9c71c837385641989576ec32b76c2
     m_Address: Setting
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a57859764fc978f43a410bec7e44222e
+    m_Address: StageSelect
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
