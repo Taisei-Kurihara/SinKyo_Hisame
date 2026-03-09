@@ -11,4 +11,5 @@ public abstract class EnemState_abstract
         Debug.Log($"[EnemState_abstract] Act - StateType: {stateType}");
         await UniTask.CompletedTask;
     }
+
 }

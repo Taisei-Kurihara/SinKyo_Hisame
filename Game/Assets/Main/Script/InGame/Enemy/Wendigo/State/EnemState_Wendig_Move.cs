@@ -43,6 +43,9 @@ public class EnemState_Wendig_Move : EnemState_abstract
         // フラグリセット.
         StoppedByPlayerProximity = false;
 
+        // プレイヤー位置取得用.
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+
         // EnemMovementHelperに委譲.
         var result = await EnemMovementHelper.ExecuteMove(enemyModel, new EnemMoveParams
         {
@@ -54,6 +57,10 @@ public class EnemState_Wendig_Move : EnemState_abstract
             Timeout = moveTimeout,
             ArrivalThreshold = 0.5f,
             SetMoveAnimation = true,
+            // プレイヤー位置の動的取得（振り向き + 近接持続チェック用）.
+            GetLivePlayerPosition = () => playerObj != null ? playerObj.transform.position : lookAtPos,
+            SustainedProximityDuration = 0.5f,
+            SustainedProximityRange = 2f,
             CancelConditions = new List<EnemMoveCancelCondition>
             {
                 new EnemMoveCancelCondition
@@ -62,7 +69,8 @@ public class EnemState_Wendig_Move : EnemState_abstract
                     ShouldCancel = (model, pos) =>
                     {
                         // プレイヤーとの距離が近接範囲内ならキャンセル.
-                        return Vector2.Distance(pos, (Vector2)lookAtPos) <= meleeAttackRange;
+                        if (playerObj == null) return false;
+                        return Vector2.Distance(pos, (Vector2)playerObj.transform.position) <= meleeAttackRange;
                     }
                 }
             }
@@ -70,5 +78,10 @@ public class EnemState_Wendig_Move : EnemState_abstract
 
         // プレイヤー近接検知結果を反映.
         StoppedByPlayerProximity = result.Cancelled && result.CancelReason == "PlayerProximity";
+        // 持続近接で中断した場合も反映.
+        if (result.StoppedBySustainedProximity)
+        {
+            StoppedByPlayerProximity = true;
+        }
     }
 }

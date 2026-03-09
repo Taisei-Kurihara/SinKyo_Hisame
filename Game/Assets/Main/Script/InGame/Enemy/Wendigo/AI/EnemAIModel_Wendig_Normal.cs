@@ -35,6 +35,13 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
     // バトル開始済みフラグ.
     private bool hasBattleStarted = false;
 
+    // AI開始時刻（攻撃抑制用）.
+    private float aiStartTime = -1f;
+
+    // 突進後の攻撃クールダウン.
+    private float lastRushEndTime = -100f;
+    private const float postRushCooldown = 1.5f;
+
     // カメラ範囲設定（プレイヤーを中心とした範囲）.
     private float cameraViewRangeX = 8f;
     private float cameraViewRangeY = 5f;
@@ -111,18 +118,25 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
     }
 
     // Wendig固有のAI処理を実装.
+
     protected override async UniTask OnAIUpdate(CancellationToken token)
     {
         // 初期化.
         InitializeActionSettings();
 
-        // バトル開始処理（初回のみ）.
-        if (!hasBattleStarted && ownerModel is EnemyModel_Wendig wendigModel)
+        // AI開始時刻を記録.
+        if (aiStartTime < 0f)
         {
-            hasBattleStarted = true;
-            Debug.Log($"[EnemAIModel_Wendig_Normal] バトル開始 - Howling → TripleAttack");
-            await wendigModel.TriggerBattleStart();
+            aiStartTime = Time.time;
         }
+
+        // バトル開始処理（初回のみ）— コメントアウト: AI開始直後の攻撃抑制のため.
+        // if (!hasBattleStarted && ownerModel is EnemyModel_Wendig wendigModel)
+        // {
+        //     hasBattleStarted = true;
+        //     Debug.Log($"[EnemAIModel_Wendig_Normal] バトル開始 - Howling → TripleAttack");
+        //     await wendigModel.TriggerBattleStart();
+        // }
 
         // 怒り状態Howling実行（怒り開始時に1回だけ）.
         if (pendingAngerHowling && ownerModel is EnemyModel_Wendig wendigModelAnger)
@@ -146,6 +160,24 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
         Vector3 targetPos = TargetPosition;
         float distance = ownerTransform != null ? Vector3.Distance(ownerTransform.position, targetPos) : float.MaxValue;
 
+        // AI開始から1秒間は攻撃を行わず、ランダム移動のみ実行.
+        if (Time.time - aiStartTime < 1f)
+        {
+            Debug.Log($"[EnemAIModel_Wendig_Normal] AI開始ディレイ中 - ランダム移動のみ");
+            await ExecuteRandomMove(targetPos);
+            currentActionSetting = null;
+            return;
+        }
+
+        // 突進後1.5秒間は攻撃を行わず、ランダム移動のみ実行.
+        if (Time.time - lastRushEndTime < postRushCooldown)
+        {
+            Debug.Log($"[EnemAIModel_Wendig_Normal] 突進後クールダウン中 - ランダム移動のみ");
+            await ExecuteRandomMove(targetPos);
+            currentActionSetting = null;
+            return;
+        }
+
         // カメラ範囲外にいる場合は優先的にカメラ内へ移動.
         if (IsOutsideCameraView(targetPos))
         {
@@ -168,7 +200,8 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
                 selectedSetting.ConsumeRepeat();
                 meleeAttacksSinceLastRush = 0; // 突進後、近接カウンターをリセット.
                 randomMoveCount = 0;
-                Debug.Log($"[EnemAIModel_Wendig_Normal] 突進完了 - 近接カウンターリセット");
+                lastRushEndTime = Time.time; // 突進後クールダウン開始.
+                Debug.Log($"[EnemAIModel_Wendig_Normal] 突進完了 - 近接カウンターリセット, クールダウン開始");
                 currentActionSetting = null;
                 return;
             }
@@ -232,13 +265,13 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
                 if (moveActionSetting.moveState is EnemState_Wendig_MeleeApproach approach)
                 {
                     approach.SetTargetPosition(targetPos);
-                    approach.SetSpeedMultiplier(isAngry ? 2.6f : 1.3f);
+                    approach.SetSpeedMultiplier(isAngry ? 9.6f : 4.8f);
                 }
                 else if (moveActionSetting.moveState is EnemState_Wendig_Move move)
                 {
                     move.SetMovePos(targetPos);
                     move.SetLookAtPos(targetPos);
-                    move.SetSpeedMultiplier(isAngry ? 4f : 2f);
+                    move.SetSpeedMultiplier(isAngry ? 6f : 3f);
                 }
 
                 // 移動実行（stateがタイムアウトまたは完了するまで待機）.
@@ -265,7 +298,8 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
                         moveActionSetting.ConsumeRepeat();
                         meleeAttacksSinceLastRush = 0;
                         randomMoveCount = 0;
-                        Debug.Log($"[EnemAIModel_Wendig_Normal] 移動後突進完了 - 近接カウンターリセット");
+                        lastRushEndTime = Time.time; // 突進後クールダウン開始.
+                        Debug.Log($"[EnemAIModel_Wendig_Normal] 移動後突進完了 - 近接カウンターリセット, クールダウン開始");
                         currentActionSetting = null;
                         return;
                     }
@@ -310,17 +344,7 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
             else
             {
                 // ランダム移動.
-                randomMoveCount++;
-                Vector2 randomPos = new Vector2(
-                    Random.Range(ownerModel.StageMin.x, ownerModel.StageMax.x),
-                    Random.Range(ownerModel.StageMin.y, ownerModel.StageMax.y)
-                );
-                moveState.SetMovePos(randomPos);
-                moveState.SetLookAtPos(targetPos);
-                moveState.SetSpeedMultiplier(isAngry ? 4f : 2f);
-
-                // 移動実行（stateがタイムアウトまたは完了するまで待機）.
-                await moveState.Act(ownerModel);
+                await ExecuteRandomMove(targetPos);
 
                 // プレイヤー近接検知で移動中断した場合、近接攻撃抽選を実行.
                 if (await TryProximityMeleeAttack(moveState.StoppedByPlayerProximity))
@@ -332,6 +356,38 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
         }
 
         currentActionSetting = null;
+    }
+
+    // ランダム移動を実行（自身から最低3ユニット離れた位置を選択）.
+    private async UniTask ExecuteRandomMove(Vector3 targetPos)
+    {
+        randomMoveCount++;
+        Vector2 currentPos = ownerTransform.position;
+        const float minDistance = 3f;
+        const int maxRetries = 5;
+
+        Vector2 randomPos = Vector2.zero;
+        for (int i = 0; i < maxRetries; i++)
+        {
+            randomPos = new Vector2(
+                Random.Range(ownerModel.StageMin.x, ownerModel.StageMax.x),
+                Random.Range(ownerModel.StageMin.y, ownerModel.StageMax.y)
+            );
+            if (Vector2.Distance(currentPos, randomPos) >= minDistance) break;
+        }
+
+        moveState.SetMovePos(randomPos);
+        moveState.SetLookAtPos(targetPos);
+        moveState.SetSpeedMultiplier(isAngry ? 6f : 3f);
+
+        // ランダム移動中はカメラ範囲を緩和.
+        float prevCameraViewRangeX = cameraViewRangeX;
+        cameraViewRangeX = 12f;
+
+        await moveState.Act(ownerModel);
+
+        // カメラ範囲を元に戻す.
+        cameraViewRangeX = prevCameraViewRangeX;
     }
 
     // 近接攻撃タイプを抽選で選択.
@@ -525,13 +581,13 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
         moveState.SetMovePos(cameraTargetPos);
         moveState.SetLookAtPos(playerPos);
         moveState.SetMoveTimeout(3f);
-        moveState.SetSpeedMultiplier(isAngry ? 8f : 4f);
+        moveState.SetSpeedMultiplier(isAngry ? 6f : 3f);
 
         await moveState.Act(ownerModel);
 
         // デフォルトに戻す.
         moveState.SetMoveTimeout(2f);
-        moveState.SetSpeedMultiplier(isAngry ? 4f : 2f);
+        moveState.SetSpeedMultiplier(isAngry ? 6f : 3f);
     }
 
     // プレイヤー近接検知による近接攻撃抽選を実行するヘルパー.
