@@ -1,0 +1,343 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Default Local Group
+  m_EditorClassIdentifier: 
+  m_GroupName: Default Local Group
+  m_GUID: a82726d5bec8d13408b0fad21b6def2d
+  m_SerializeEntries:
+  - m_GUID: 01c0dfc22d4c2974ca55eeb61aaf969e
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/normal_heart.anim"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 0edc13e3fcb8f214ebfebf278d67e747
+    m_Address: Assets/Main/Animation/Character/heart_resist.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 10c9fd7baee4b514b9004bafe6a34ea5
+    m_Address: Assets/Main/UI/Original/Player/Dash/CharaDash2.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1586b41a99945bd4a807f2a63620ba5a
+    m_Address: "Assets/Main/UI/\u30D7\u30EC\u30A4\u30E4\u30FC\u4F53\u529B\u30B2\u30FC\u30B8/UI_HPGauge.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1781a4c883ce0134b998f767a34e468b
+    m_Address: Assets/Main/Animation/Character/Iai.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 17cf641fc0db815449df828839b0d9b6
+    m_Address: BGM_BaseHome
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1858df828ca36674a82cc11367ee6e84
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u30A4\u30E9\u30B9\u30C8.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 18bd683579c2bba45901e0995b892d17
+    m_Address: SE_AttackSwing
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1ae6806e56c6af740a4cab0a9c6d96eb
+    m_Address: Assets/Main/UI/Original/Player/Dash/CharaDash1.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 234f84236dc6b2d4aac26705d398a866
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8\uFF08\u4E2D\u8EAB\uFF09_260113.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2a1824f859389da4ebbfc927b7420895
+    m_Address: Assets/Main/Animation/Character/Character.controller
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e8acf17d7f8dfb418ecca1dbc257796
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8\u306E\u30CF\u30FC\u30C8\uFF08\u901A\u5E38\uFF09_260113.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2efb5b1c59322df42abadaf8fc9567a1
+    m_Address: Assets/Main/UI/Original/Player/Attack_Demo/BladeAttack1.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 310ea976702fcc2469e2396482f098d5
+    m_Address: "Assets/Main/UI/\u30DC\u30B9\u4F53\u529B\u30B2\u30FC\u30B8/\u30DC\u30B9\u4F53\u529B\u30B2\u30FC\u30B8\uFF08\u53C2\u7167\u7528\uFF09_260113.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 351ec72eeba5a484b8c881d54682b274
+    m_Address: Assets/Main/UI/Original/Player/Dash/CharaDash3.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 395a0ef09f04d0d47a57b53b872a10a6
+    m_Address: Assets/Main/UI/Original/Player/Dash/CharaDash7.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3dcff8e8d5624034f8f12edc817ef604
+    m_Address: Assets/Main/UI/Original/Player/Attack_Demo/BladeAttack3.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4248e405ae543074caedd85ccdbf9453
+    m_Address: Assets/Main/UI/Original/Player/Iai/Iai_-2.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4790206eadc817b4196e071640e653af
+    m_Address: HitEffect
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4de12d9cb61e10a4ca6827724c14cb43
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/hot_heart.anim"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4e9f1529a80eea649ac83c5dbd4c92df
+    m_Address: SE_Heal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4f6341547c8ead244b1cdeb9244ea2fd
+    m_Address: Assets/Main/UI/Original/Player/heart/heart_03.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5036a029ccc51bc47bc4a3327cb2d02d
+    m_Address: FirstAttackCollider
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 596d6ae5645b20047872c4ab0ac3c15f
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8\u306E\u30CF\u30FC\u30C8\uFF08175\u4EE5\u4E0A\uFF09_260113.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5ecfe06fa04adcb409449400282b37c9
+    m_Address: Assets/Main/UI/Original/Player/Attack_Demo/BladeAttack2.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5f183d05fff3f484ab7e84557828639a
+    m_Address: Assets/Main/UI/Original/Player/Dash/CharaDash8.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 63ab686381f7e5c4faa70f9cdc093d4d
+    m_Address: EnemyView
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6784a31cde7501247bf241b66ed2bfd5
+    m_Address: Assets/Main/Animation/Character/Attack_Demo.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 69ff9f7b8fb64d940b58585bbd9dadfc
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8\u306E\u30CF\u30FC\u30C8\uFF0825\u4EE5\u4E0B\uFF09_260113.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6a3287aac25ef3c46aa7408625fe02a6
+    m_Address: "Assets/Main/UI/\u30DC\u30B9\u4F53\u529B\u30B2\u30FC\u30B8/\u30DC\u30B9\u4F53\u529B\u30B2\u30FC\u30B8(\u30B2\u30FC\u30B8)_260116.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6fea1d74def89034bbe84bcbf7921361
+    m_Address: Assets/Main/UI/Original/Player/Dash/CharaDash6.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 74a3b20ceade6e749b9108897911c6e7
+    m_Address: "Assets/Main/UI/\u30D7\u30EC\u30A4\u30E4\u30FC\u4F53\u529B\u30B2\u30FC\u30B8/UI_HPAccessories.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 764ffc47ef47b1c48abe63e978f9d88a
+    m_Address: Assets/Main/UI/Original/Player/Dash/CharaDash4.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 77d7adecb75ec914aae0fb2db65bdbd0
+    m_Address: SE_AttackPre
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7a2e18469adf3b941adfddc3930dc18c
+    m_Address: EnemyRoom_Demo
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7aea67742037b0c4f8e9fcc894e6a4af
+    m_Address: Assets/Main/UI/Original/Player/Iai/Iai_01.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7d42af72757b9944b8bec9967d89a81d
+    m_Address: Assets/Main/Animation/Character/idle.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7e65a4bf9c6929346b4ee2c8dbfbade5
+    m_Address: "Assets/Main/UI/\u30DC\u30B9\u4F53\u529B\u30B2\u30FC\u30B8/\u30DC\u30B9\u4F53\u529B\u30B2\u30FC\u30B8(\u30D5\u30EC\u30FC\u30E0)_260116.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 85161dd3303e59e47920582a5c57bbf2
+    m_Address: SE_AttackHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 894fc22f049b8fa4b87474edca6e8c55
+    m_Address: "Assets/Main/UI/\u30D7\u30EC\u30A4\u30E4\u30FC\u4F53\u529B\u30B2\u30FC\u30B8/UI_HPFrame.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 94921c3d8eaa2184ca855de127359620
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/heart.controller"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a34b8da5c359f2045abe04beffc0ceb3
+    m_Address: Assets/Main/UI/Original/Player/heart/heart_02.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a4e90c4ae9c6b9940bc48390cb84d7c6
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8\uFF08\u30B2\u30FC\u30B8\uFF09_260113.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a813928736520ea41a0cca2f164e20b4
+    m_Address: PlayerEffect_Heal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: acc0911ef18cee84a82730c9a361f25c
+    m_Address: "Assets/Main/UI/\u5438\u53CE\u30B2\u30FC\u30B8/UI_AbsorptionGauge.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ad60f029ca89eb04a83073d05bee5976
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/ice_heart.anim"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ad61251d5e48db24194c97171f4d00f5
+    m_Address: SE_Stan
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: af4d879cc07db3440ac9a2e3ee3ccf93
+    m_Address: SE_AttackMiss
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: af8e8a591e3387044aa91916e6c908c7
+    m_Address: Assets/Main/Animation/Character/Guard.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b098ed66df5743b41bcc388b0e524c3e
+    m_Address: SE_Parry
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b6d3e2e4b8df2964eb3dfce561902f3e
+    m_Address: PlayerEffect_Stun
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b7add6ad2188ae64a8391402c71fc6cf
+    m_Address: Assets/Main/UI/Original/Player/Dash/CharaDash5.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b8ac62f5f20bc12408c260c2392285e6
+    m_Address: "Assets/Main/UI/\u30DC\u30BF\u30F3\u67A0/UI_Button.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b9d5451d0b0415a4bab7c7a1cf4febca
+    m_Address: PlayerView
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b9e533ef4f5cf814ea6bc0110588dcec
+    m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8\uFF08\u53C2\u7167\u7528\uFF09_260113.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bbd62467a85075940965ea86bede9b81
+    m_Address: GameOverView
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c1ada1bf77a9ced499844513a9b29c90
+    m_Address: Assets/Main/Animation/Character/Walk.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d1f508d0188368343a886ef93af40939
+    m_Address: Assets/Main/UI/Original/Player/idle.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: d46b9fed4c0f8a74eb983bce3fb713e3
+    m_Address: Assets/Main/UI/Original/Player/heart/heart_01.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: de03584afdde2154d8535edc9c176504
+    m_Address: SE_IaiAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e84788b2ca0541f428e9ee47be122377
+    m_Address: "Assets/Main/UI/\u5438\u53CE\u30B2\u30FC\u30B8/UI_AbsorptionFrame.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e9a30bbbf38ed744999e1a5fa36110f7
+    m_Address: "Assets/Main/UI/\u56DE\u5FA9\u30A2\u30A4\u30B3\u30F3/UI_Recover.png"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ec42be1ef22040d47b3f1af4265ed0de
+    m_Address: Assets/Main/UI/Original/Player/Iai/Iai_03.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f8b22b9d050e1634bb177ea1f3714c04
+    m_Address: PlayerDebug
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: af6a96e5c0baec84e9a45e8411742a0b, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 4c22d61211201254aa2249976461377a, type: 2}
+    - {fileID: 11400000, guid: 1fb6aa82a2602cb42867dd47c2264955, type: 2}
