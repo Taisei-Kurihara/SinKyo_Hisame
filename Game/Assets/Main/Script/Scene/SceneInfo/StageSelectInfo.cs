@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Common;
 using Cysharp.Threading.Tasks;
 
@@ -16,15 +16,15 @@ namespace SceneInfo {
 
         void ISceneInfo.InputStart()
         {
-            InputSystemActionsManager manager=InputSystemActionsManager.Instance();
+            //InputSystemActionsManager manager=InputSystemActionsManager.Instance();
             //ステージセレクト画面の時はUIをOnに。
-            manager.EnableUI();
+            //manager.EnableUI();
         }
 
         void ISceneInfo.InputStop()
         {
-            InputSystemActionsManager manager = InputSystemActionsManager.Instance();
-            manager.UIDisable();
+            //InputSystemActionsManager manager = InputSystemActionsManager.Instance();
+            //manager.UIDisable();
         }
     }
 }
