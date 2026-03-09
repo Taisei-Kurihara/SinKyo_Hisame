@@ -47,6 +47,10 @@ public class EnemState_Wendig_MeleeApproach : EnemState_abstract
             Timeout = approachDuration,
             ArrivalThreshold = arrivalThreshold,
             SetMoveAnimation = true,
+            // プレイヤー位置の動的取得（振り向き + 近接持続チェック用）.
+            GetLivePlayerPosition = () => playerObj != null ? playerObj.transform.position : targetPosition,
+            SustainedProximityDuration = 0.5f,
+            SustainedProximityRange = 2f,
             CancelConditions = new List<EnemMoveCancelCondition>
             {
                 new EnemMoveCancelCondition
@@ -64,5 +68,10 @@ public class EnemState_Wendig_MeleeApproach : EnemState_abstract
 
         // プレイヤー近接検知結果を反映.
         StoppedByPlayerProximity = result.Cancelled && result.CancelReason == "PlayerProximity";
+        // 持続近接で中断した場合も反映.
+        if (result.StoppedBySustainedProximity)
+        {
+            StoppedByPlayerProximity = true;
+        }
     }
 }

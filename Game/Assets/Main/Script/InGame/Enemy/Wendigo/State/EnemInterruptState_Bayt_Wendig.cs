@@ -35,9 +35,8 @@ public class EnemInterruptState_Bayt_Wendig : EnemInterruptState_abstract
         animator.SetTrigger("Bayt");
 
         // === 前段階 ===.
-        // 1100ms待機 → 攻撃通告(パリィ可能) → 400ms待機.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
-            enemyModel, 1500f, true, 400f, animSpeed)) return;
+            enemyModel, 1500f, true, 300f, animSpeed)) return;
 
         // === 攻撃中 ===.
         // 攻撃判定を400ms維持.

@@ -27,9 +27,8 @@ public class EnemState_Wendig_Howling : EnemState_abstract
         enemyModel.Animator.SetTrigger("Howling");
 
         // === 前段階 ===.
-        // 300ms待機 → 攻撃通告(パリィ不可) → 1000ms待機.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
-            enemyModel, 1300f, false, 1000f, animSpeed)) return;
+            enemyModel, 500f, false, 300f, animSpeed)) return;
 
         // === 攻撃中 ===.
         // 円形の攻撃判定を生成し400ms維持.
