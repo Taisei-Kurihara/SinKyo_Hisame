@@ -11,7 +11,7 @@ namespace GameEventPoint
     {
         public override void OnEvent()
         {
-            SceneManager.Instance().LoadMainScene(new EnemyRoomDemoInfo()).Forget();
+            SceneManager.Instance().LoadMainScene(new BaseHomeInfo()).Forget();
         }
     }
 }
