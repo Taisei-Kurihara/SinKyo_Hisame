@@ -27,7 +27,7 @@ namespace SceneEventer
                     GameStart();
                     break;
                 case var _ when button == newGame:
-                    GameStart();
+                    NewGame();
                     break;
                 case var _ when button == setting:
                     break;
@@ -52,6 +52,12 @@ namespace SceneEventer
         {
             SceneManager.Instance().LoadMainScene(new MainSceneInfo()).Forget();
         }
+
+        public void NewGame()
+        {
+            SceneManager.Instance().LoadMainScene(new StageSelectInfo()).Forget();
+        }
+
         /// <summary>
         /// Game終了処理。
         /// </summary>
