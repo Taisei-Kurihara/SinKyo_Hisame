@@ -46,6 +46,9 @@ public class EnemMoveResult
 
     // null化で中断されたか.
     public bool NullInterrupted;
+
+    // プレイヤー近接持続で中断されたか.
+    public bool StoppedBySustainedProximity;
 }
 
 // 移動パラメータの設定.
@@ -80,6 +83,15 @@ public class EnemMoveParams
 
     // 移動開始時にMoveアニメーションを設定するか.
     public bool SetMoveAnimation = true;
+
+    // プレイヤー位置を動的に取得する関数（nullならPlayerPosition固定使用）.
+    public System.Func<Vector3> GetLivePlayerPosition;
+
+    // プレイヤー近接持続で移動中断するまでの時間（秒、0以下で無効）.
+    public float SustainedProximityDuration = 0f;
+
+    // プレイヤー近接範囲.
+    public float SustainedProximityRange = 2f;
 }
 
 // 移動処理の共通ヘルパークラス.
@@ -121,6 +133,14 @@ public static class EnemMovementHelper
 
         float elapsedTime = 0f;
 
+        // プレイヤー位置監視用タイマー.
+        float playerMonitorTimer = 0f;
+        const float playerMonitorInterval = 1f;
+
+        // プレイヤー近接持続チェック用.
+        float sustainedProximityTimer = 0f;
+        bool sustainedProximityEnabled = moveParams.SustainedProximityDuration > 0f;
+
         while (elapsedTime < moveParams.Timeout)
         {
             if (!EnemNullSafetyHelper.IsValid(enemyModel))
@@ -131,6 +151,47 @@ public static class EnemMovementHelper
 
             Vector2 currentPos = ownerTransform.position;
             float distanceToTarget = Vector2.Distance(currentPos, moveParams.Destination);
+
+            // プレイヤー位置の動的更新.
+            if (moveParams.GetLivePlayerPosition != null)
+            {
+                Vector3 livePlayerPos = moveParams.GetLivePlayerPosition();
+                playerMonitorTimer += Time.deltaTime;
+
+                // FacePlayer: 毎フレームPlayerPositionを動的更新.
+                if (moveParams.FacingMode == EnemFacingMode.FacePlayer)
+                {
+                    moveParams.PlayerPosition = livePlayerPos;
+                }
+                // FaceMovement: 1秒ごとにプレイヤー方向へ振り向く.
+                else if (moveParams.FacingMode == EnemFacingMode.FaceMovement && playerMonitorTimer >= playerMonitorInterval)
+                {
+                    EnemFacingHelper.FaceToward(ownerTransform, livePlayerPos);
+                    playerMonitorTimer = 0f;
+                }
+
+                // プレイヤー近接持続チェック.
+                if (sustainedProximityEnabled)
+                {
+                    float distToPlayer = Vector2.Distance(currentPos, (Vector2)livePlayerPos);
+                    if (distToPlayer <= moveParams.SustainedProximityRange)
+                    {
+                        sustainedProximityTimer += Time.deltaTime;
+                        if (sustainedProximityTimer >= moveParams.SustainedProximityDuration)
+                        {
+                            result.Cancelled = true;
+                            result.CancelReason = "SustainedProximity";
+                            result.StoppedBySustainedProximity = true;
+                            rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        sustainedProximityTimer = 0f;
+                    }
+                }
+            }
 
             // 到達判定.
             if (distanceToTarget <= moveParams.ArrivalThreshold)

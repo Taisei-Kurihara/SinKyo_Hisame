@@ -1,6 +1,7 @@
 using Common;
 using Cysharp.Threading.Tasks;
 using InGame;
+using InGame.Enemy;
 using InGame.Player;
 using Setting;
 using UnityEngine;
@@ -20,6 +21,10 @@ namespace SceneInfo
             playerManager.pulseModel.ResetToBase();
             await playerManager.InstantiateCharacter("PlayerCharacter");
             Debug.Log("[MainSceneInfo] PlayerCharacter生成完了");
+
+            // 敵キャラクター生成（PlayerPrefsからEnemyName読み取り）.
+            await EnemyManager.Instance().InstantiateEnemyFromPrefs(autoSpawn: true);
+            Debug.Log("[MainSceneInfo] Enemy生成完了");
 
             // ヒットエフェクトプール初期化.
             await HitEffectPool.Instance(false).InitPool("HitEffect");
