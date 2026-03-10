@@ -16,6 +16,10 @@ public class EnemState_Wendig_Move : EnemState_abstract
     // プレイヤー近接で移動中断したかどうか（AIループ側で参照）.
     public bool StoppedByPlayerProximity { get; private set; } = false;
 
+    // ライフサイクル間共有データ.
+    private EnemMoveResult lastMoveResult;
+    private GameObject playerObj;
+
     public void SetMovePos(Vector2 targetPos)
     {
         moveTargetPos = targetPos;
@@ -36,18 +40,24 @@ public class EnemState_Wendig_Move : EnemState_abstract
         speedMultiplier = multiplier;
     }
 
-    public override async UniTask Act(EnemyModel_abstract enemyModel)
+    protected override async UniTask OnPreAction(EnemyModel_abstract enemyModel)
     {
-        if (!EnemNullSafetyHelper.IsValid(enemyModel)) return;
+        if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
         // フラグリセット.
         StoppedByPlayerProximity = false;
+        lastMoveResult = default;
 
         // プレイヤー位置取得用.
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+        playerObj = GameObject.FindGameObjectWithTag("Player");
 
+        await UniTask.CompletedTask;
+    }
+
+    protected override async UniTask OnAction(EnemyModel_abstract enemyModel)
+    {
         // EnemMovementHelperに委譲.
-        var result = await EnemMovementHelper.ExecuteMove(enemyModel, new EnemMoveParams
+        lastMoveResult = await EnemMovementHelper.ExecuteMove(enemyModel, new EnemMoveParams
         {
             Destination = moveTargetPos,
             Classification = EnemMoveClassification.RandomMove,
@@ -75,13 +85,17 @@ public class EnemState_Wendig_Move : EnemState_abstract
                 }
             }
         });
+    }
 
+    protected override async UniTask OnAfterPostAction(EnemyModel_abstract enemyModel)
+    {
         // プレイヤー近接検知結果を反映.
-        StoppedByPlayerProximity = result.Cancelled && result.CancelReason == "PlayerProximity";
+        StoppedByPlayerProximity = lastMoveResult.Cancelled && lastMoveResult.CancelReason == "PlayerProximity";
         // 持続近接で中断した場合も反映.
-        if (result.StoppedBySustainedProximity)
+        if (lastMoveResult.StoppedBySustainedProximity)
         {
             StoppedByPlayerProximity = true;
         }
+        await UniTask.CompletedTask;
     }
 }

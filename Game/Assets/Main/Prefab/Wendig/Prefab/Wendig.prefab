@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4890791845590439474}
   - component: {fileID: 6576774660123036328}
   - component: {fileID: 8203095754688287378}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Hosi
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -124,7 +124,7 @@ GameObject:
   - component: {fileID: 8684836066006926276}
   - component: {fileID: 84812294376283903}
   - component: {fileID: 4455194533893558482}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: Wendig
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -289,7 +289,7 @@ GameObject:
   - component: {fileID: 3913134836543363830}
   - component: {fileID: 4428468778944868755}
   - component: {fileID: 8401479981458174408}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: WendigSprite
   m_TagString: Untagged
   m_Icon: {fileID: 0}

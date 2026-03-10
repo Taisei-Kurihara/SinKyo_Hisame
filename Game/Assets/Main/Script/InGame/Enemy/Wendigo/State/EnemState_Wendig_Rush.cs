@@ -16,7 +16,24 @@ public class EnemState_Wendig_Rush : EnemState_abstract
     private float stageMaxX;
     private float rushSpeed = 20f;
     private float moveToEdgeSpeed = 12f;
-    private int waitFrames = 40;
+
+    // ライフサイクル間共有データ.
+    private Rigidbody2D rb;
+    private Collider2D mainColl;
+    private Transform ownerTransform;
+    private Animator animator;
+    private RigidbodyConstraints2D originalConstraints;
+    private bool originalIsTrigger;
+    private float oppositeEdgeX;
+    private float oppositeDirectionX;
+    private float effectiveRushSpeed;
+    private bool stateModified = false;
+    private int originalLayer = -1;
+
+    public EnemState_Wendig_Rush()
+    {
+        postActionWaitFrames = 60;
+    }
 
     public void SetStageEdge(float minX, float maxX)
     {
@@ -24,9 +41,11 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         stageMaxX = maxX;
     }
 
-    public override async UniTask Act(EnemyModel_abstract enemyModel)
+    protected override async UniTask OnPreAction(EnemyModel_abstract enemyModel)
     {
-        if (!EnemNullSafetyHelper.IsValid(enemyModel)) return;
+        stateModified = false;
+
+        if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
         // 現在の攻撃力から実ダメージを計算.
         if (enemyModel is EnemyModel_Wendig wendigModel)
@@ -34,29 +53,30 @@ public class EnemState_Wendig_Rush : EnemState_abstract
             rushDamage = (int)(wendigModel.GetCurrentAttackPower() * rushMultiplier);
         }
 
-        Rigidbody2D rb = enemyModel.Rigidbody;
-        Transform ownerTransform = enemyModel.Presenter.transform;
-        Animator animator = enemyModel.Animator;
-        Collider2D mainColl = enemyModel.Presenter.MainColl;
+        rb = enemyModel.Rigidbody;
+        ownerTransform = enemyModel.Presenter.transform;
+        animator = enemyModel.Animator;
+        mainColl = enemyModel.Presenter.MainColl;
         float animSpeed = enemyModel.AnimSpeed;
 
         // 怒り時は速度2倍.
         float angerSpeedMult = animSpeed > 1f ? 2f : 1f;
-        float effectiveRushSpeed = rushSpeed * angerSpeedMult;
+        effectiveRushSpeed = rushSpeed * angerSpeedMult;
         float effectiveMoveToEdgeSpeed = moveToEdgeSpeed * angerSpeedMult;
 
-        if (rb == null || ownerTransform == null) return;
+        if (rb == null || ownerTransform == null) { isAborted = true; return; }
 
         // 元の状態を保存.
-        RigidbodyConstraints2D originalConstraints = rb.constraints;
-        bool originalIsTrigger = mainColl != null ? mainColl.isTrigger : false;
+        originalConstraints = rb.constraints;
+        originalIsTrigger = mainColl != null ? mainColl.isTrigger : false;
 
-        // 突進中はY軸固定とコライダーをトリガーに設定.
+        // 突進中はY軸固定とコライダーをトリガーに設定（すり抜け用）.
         rb.constraints = originalConstraints | RigidbodyConstraints2D.FreezePositionY;
         if (mainColl != null)
         {
             mainColl.isTrigger = true;
         }
+        stateModified = true;
 
         Vector2 currentPos = ownerTransform.position;
 
@@ -64,7 +84,7 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         float distToMin = Mathf.Abs(currentPos.x - stageMinX);
         float distToMax = Mathf.Abs(currentPos.x - stageMaxX);
         float targetEdgeX = distToMin < distToMax ? stageMinX : stageMaxX;
-        float oppositeEdgeX = distToMin < distToMax ? stageMaxX : stageMinX;
+        oppositeEdgeX = distToMin < distToMax ? stageMaxX : stageMinX;
 
         // === 前段階 ===.
         // 1. 端の方向を見ながら端まで移動.
@@ -83,27 +103,15 @@ public class EnemState_Wendig_Rush : EnemState_abstract
             SetMoveAnimation = true
         });
 
-        if (edgeMoveResult.NullInterrupted)
-        {
-            RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
-            return;
-        }
+        if (edgeMoveResult.NullInterrupted) { isAborted = true; return; }
 
         // 2. 逆方向を見る.
-        if (!EnemNullSafetyHelper.IsValid(enemyModel))
-        {
-            RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
-            return;
-        }
-        float oppositeDirectionX = Mathf.Sign(oppositeEdgeX - ownerTransform.position.x);
+        if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
+        oppositeDirectionX = Mathf.Sign(oppositeEdgeX - ownerTransform.position.x);
         EnemFacingHelper.FaceDirection(ownerTransform, oppositeDirectionX);
 
         // 3. Assault_Pre トリガー実行.
-        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
-        {
-            RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
-            return;
-        }
+        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
         animator.SetTrigger("Assault_Pre");
         await UniTask.WaitUntil(() =>
         {
@@ -113,27 +121,33 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         });
 
         // 攻撃通告: パリィ不可 (突進の0.3秒前).
-        if (!EnemNullSafetyHelper.IsValid(enemyModel))
-        {
-            RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
-            return;
-        }
+        if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
         enemyModel.Presenter.PlayAttackWarning(false);
         await UniTask.Delay((int)(300 / animSpeed));
+    }
 
-        // === 攻撃中 ===.
-        if (!EnemNullSafetyHelper.IsValid(enemyModel))
+    protected override async UniTask OnAction(EnemyModel_abstract enemyModel)
+    {
+        if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
+
+        // 攻撃中はレイヤーをDefaultに変更（既存コライダーで当たり判定を行うため）.
+        originalLayer = EnemColliderHelper.SetAttackLayer(ownerTransform);
+        // mainCollが子オブジェクト上にある場合、そのレイヤーもDefaultに変更.
+        int mainCollOriginalLayer = -1;
+        if (mainColl != null && mainColl.gameObject != ownerTransform.gameObject)
         {
-            RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
-            return;
+            mainCollOriginalLayer = mainColl.gameObject.layer;
+            mainColl.gameObject.layer = LayerMask.NameToLayer("Default");
         }
 
-        // 突進中のヒット検出を設定（既存コライダー使用）.
+        // 既存コライダー（mainColl）でヒット検出.
         colliderState.ClearHitTargets();
         colliderState.SetDamage(rushDamage);
         EnemyAttackHitDetector rushHitDetector = null;
         if (mainColl != null)
         {
+            // HitDetectorはRigidbody2Dがある ownerTransform に設置.
+            // (子オブジェクトのCollider2DのトリガーイベントはRigidbody2Dの親に送信される).
             rushHitDetector = EnemColliderHelper.AttachHitDetector(
                 ownerTransform, colliderState,
                 new List<Collider2D> { mainColl });
@@ -147,7 +161,10 @@ public class EnemState_Wendig_Rush : EnemState_abstract
             if (!EnemNullSafetyHelper.IsValid(enemyModel))
             {
                 if (rushHitDetector != null) Object.Destroy(rushHitDetector);
-                RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
+                // 子オブジェクトのレイヤー復元.
+                if (mainCollOriginalLayer >= 0 && mainColl != null)
+                    mainColl.gameObject.layer = mainCollOriginalLayer;
+                isAborted = true;
                 return;
             }
             rb.linearVelocity = new Vector2(oppositeDirectionX * effectiveRushSpeed, rb.linearVelocity.y);
@@ -160,35 +177,47 @@ public class EnemState_Wendig_Rush : EnemState_abstract
             Object.Destroy(rushHitDetector);
         }
 
-        if (!EnemNullSafetyHelper.IsValid(enemyModel))
+        // 子オブジェクトのレイヤー復元.
+        if (mainCollOriginalLayer >= 0 && mainColl != null)
         {
-            RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
-            return;
+            mainColl.gameObject.layer = mainCollOriginalLayer;
         }
+
+        if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
         rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
+    }
 
-        // === 攻撃後 ===.
-        animator.SetTrigger("Assault_End");
-
-        // フレーム待機.
-        if (!await EnemAttackPhaseHelper.WaitPostAttackFrames(enemyModel, waitFrames, animSpeed))
+    protected override async UniTask OnPrePostAction(EnemyModel_abstract enemyModel)
+    {
+        if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
-            RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
-            return;
+            animator.SetTrigger("Assault_End");
         }
+        await UniTask.CompletedTask;
+    }
 
+    protected override async UniTask OnAfterPostAction(EnemyModel_abstract enemyModel)
+    {
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
             animator.SetTrigger("Assault_Finish");
         }
 
-        // 元の状態を復元.
-        RestoreState(rb, mainColl, originalConstraints, originalIsTrigger);
+        // 元の状態を復元（常に実行 — クリーンアップ保証）.
+        RestoreState();
+        await UniTask.CompletedTask;
     }
 
     // 元の状態を復元するヘルパーメソッド.
-    private void RestoreState(Rigidbody2D rb, Collider2D mainColl, RigidbodyConstraints2D originalConstraints, bool originalIsTrigger)
+    private void RestoreState()
     {
+        // レイヤー復元.
+        if (originalLayer >= 0)
+        {
+            EnemColliderHelper.RestoreLayer(ownerTransform, originalLayer);
+            originalLayer = -1;
+        }
+        if (!stateModified) return;
         if (rb != null)
         {
             rb.constraints = originalConstraints;
@@ -197,5 +226,6 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         {
             mainColl.isTrigger = originalIsTrigger;
         }
+        stateModified = false;
     }
 }

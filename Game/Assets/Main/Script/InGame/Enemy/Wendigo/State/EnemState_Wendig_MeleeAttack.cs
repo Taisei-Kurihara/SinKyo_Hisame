@@ -12,15 +12,22 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
     // ヒット処理.
     private EnemColliderState_Wendig_MeleeAttack colliderState = new EnemColliderState_Wendig_MeleeAttack();
 
-    public override async UniTask Act(EnemyModel_abstract enemyModel)
+    // ライフサイクル間共有データ.
+    private int attackDamage;
+
+    public EnemState_Wendig_MeleeAttack()
     {
-        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) return;
+        postActionWaitFrames = 60;
+    }
+
+    protected override async UniTask OnPreAction(EnemyModel_abstract enemyModel)
+    {
+        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
 
         float animSpeed = enemyModel.AnimSpeed;
-        Animator animator = enemyModel.Animator;
 
         // 現在の攻撃力から実ダメージを計算.
-        int attackDamage = 23;
+        attackDamage = 23;
         if (enemyModel is EnemyModel_Wendig wendigModel)
         {
             attackDamage = (int)(wendigModel.GetCurrentAttackPower() * attackMultiplier);
@@ -30,12 +37,19 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
         colliderState.ClearHitTargets();
         colliderState.SetDamage(attackDamage);
 
-        animator.SetTrigger("Attack");
+        enemyModel.Animator.SetTrigger("Attack");
 
         // === 前段階 ===.
         // 200ms待機 → 攻撃通告(パリィ可能) → 300ms待機.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
-            enemyModel, 500f, true, 300f, animSpeed)) return;
+            enemyModel, 500f, true, 300f, animSpeed)) { isAborted = true; return; }
+    }
+
+    protected override async UniTask OnAction(EnemyModel_abstract enemyModel)
+    {
+        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
+
+        Animator animator = enemyModel.Animator;
 
         // === 攻撃中 ===.
         // Attackアニメーション終了まで当たり判定を維持.
@@ -58,14 +72,14 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
                 var stateInfo = animator.GetCurrentAnimatorStateInfo(0);
                 return !stateInfo.IsName("Attack") || stateInfo.normalizedTime >= 1f;
             });
+    }
 
-        // === 攻撃後 ===.
-        // フレーム待機 → Attack_End トリガー.
-        if (!await EnemAttackPhaseHelper.WaitPostAttackFrames(enemyModel, 40, animSpeed)) return;
-
+    protected override async UniTask OnAfterPostAction(EnemyModel_abstract enemyModel)
+    {
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
-            animator.SetTrigger("Attack_End");
+            enemyModel.Animator.SetTrigger("Attack_End");
         }
+        await UniTask.CompletedTask;
     }
 }
