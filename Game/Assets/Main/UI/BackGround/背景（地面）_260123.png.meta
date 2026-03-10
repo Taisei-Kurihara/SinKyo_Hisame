@@ -40,9 +40,9 @@ TextureImporter:
     filterMode: 1
     aniso: 1
     mipBias: 0
-    wrapU: 1
-    wrapV: 1
-    wrapW: 1
+    wrapU: 0
+    wrapV: 0
+    wrapW: 0
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
@@ -142,12 +142,12 @@ TextureImporter:
       name: "\u80CC\u666F\uFF08\u5730\u9762\uFF09_260123_0"
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1024
-        height: 110
-      alignment: 0
-      pivot: {x: 0, y: 0}
+        x: 5
+        y: 59
+        width: 907
+        height: 58
+      alignment: 7
+      pivot: {x: 0.5, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -160,11 +160,33 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
+    - serializedVersion: 2
+      name: "\u80CC\u666F\uFF08\u5730\u9762\uFF09_260123_1"
+      rect:
+        serializedVersion: 2
+        x: 5
+        y: 1
+        width: 907
+        height: 58
+      alignment: 2
+      pivot: {x: 0.5, y: 1}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 505bc05583626584e8a69e8ba4924747
+      internalID: -1469404065
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 
+    spriteID: 5e97eb03825dee720800000000000000
     internalID: 0
     vertices: []
     indices: 
@@ -175,6 +197,7 @@ TextureImporter:
       entries: []
     nameFileIdTable:
       "\u80CC\u666F\uFF08\u5730\u9762\uFF09_260123_0": 192956552192892266
+      "\u80CC\u666F\uFF08\u5730\u9762\uFF09_260123_1": -1469404065
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
