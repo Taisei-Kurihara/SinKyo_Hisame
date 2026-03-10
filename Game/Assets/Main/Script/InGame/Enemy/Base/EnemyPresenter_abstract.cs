@@ -151,15 +151,26 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
     /// </summary>
     private async UniTaskVoid WaitAndSetEnemyName()
     {
-        view = Object.FindFirstObjectByType<EnemyUIView>();
+        // EnemyManagerが先にEnemyUIViewを準備しているので、直接取得を試みる.
+        view = InGame.Enemy.EnemyManager.Instance().EnemyUIView;
+
+        // 万が一まだ準備されていない場合はシーン探索 + 待機.
         if (view == null)
         {
-            Debug.LogWarning($"[{gameObject.name}] EnemyUIView が見つかりません.");
-            return;
+            await UniTask.WaitUntil(() =>
+            {
+                view = Object.FindFirstObjectByType<EnemyUIView>();
+                return view != null;
+            });
         }
 
-        await UniTask.WaitUntil(() => view.IsSetterReady);
+        if (!view.IsSetterReady)
+        {
+            await UniTask.WaitUntil(() => view.IsSetterReady);
+        }
+
         view.SetEnemyName(EnemyName);
+        view.EnableEnemyUI();
         Debug.Log($"[EnemyPresenter_abstract] EnemyName設定完了 - {EnemyName}");
 
         // HP変化時にhpPercentを更新.
@@ -174,8 +185,6 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
                 .AddTo(this);
             Debug.Log($"[EnemyPresenter_abstract] HP購読設定完了");
         }
-
-        //TestHpDrain().Forget();
     }
 
     // 派生クラスでmodel/statusのAddComponentを行う.
