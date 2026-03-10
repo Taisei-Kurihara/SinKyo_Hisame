@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4505842306875540844}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: AttackColliders
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -41,7 +41,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1718069159903632785}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: SensorCollider
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -78,7 +78,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7611168714687230608}
   - component: {fileID: 5730299171119293263}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: WallSensor_RDown
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -146,7 +146,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1767628781396410971}
   - component: {fileID: 8982218421451633277}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: NormalAttack_Demo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -224,7 +224,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7007813551889380063}
   - component: {fileID: 2593163882444264209}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: WallSensor_LDown
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -292,7 +292,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8225499663819804877}
   - component: {fileID: 2454197587664638558}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: WallSensor_LUp
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -366,7 +366,7 @@ GameObject:
   - component: {fileID: 4456401617419860409}
   - component: {fileID: 2250027557523056389}
   - component: {fileID: 4312146636866330261}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: PlayerObject
   m_TagString: Player
   m_Icon: {fileID: 0}
@@ -600,7 +600,7 @@ GameObject:
   m_Component:
   - component: {fileID: 4480581667289422728}
   - component: {fileID: 1561546689017144406}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: GroundSensor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -668,7 +668,7 @@ GameObject:
   m_Component:
   - component: {fileID: 8314933164742534854}
   - component: {fileID: 6973386576231073826}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: WallSensor_RUp
   m_TagString: Untagged
   m_Icon: {fileID: 0}
