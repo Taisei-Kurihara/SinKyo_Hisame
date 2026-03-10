@@ -310,6 +310,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dcdac160e4ab6ee4f9167d9de211e380
+    m_Address: Windigo
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: de03584afdde2154d8535edc9c176504
     m_Address: SE_IaiAttack
     m_ReadOnly: 0

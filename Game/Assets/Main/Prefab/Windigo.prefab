@@ -411,7 +411,7 @@ GameObject:
   - component: {fileID: 1194315046407990223}
   - component: {fileID: 9084089488784743642}
   m_Layer: 5
-  m_Name: Window
+  m_Name: Windigo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

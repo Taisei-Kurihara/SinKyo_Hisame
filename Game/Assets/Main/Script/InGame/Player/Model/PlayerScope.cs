@@ -38,12 +38,10 @@ namespace InGame.Player
 
         // View部分は再生成が多い為.
         private GameObject playerView;
-        private GameObject enemyView;
         private GameObject gameOverViewObj;
 
         // Addressable ハンドル保持（解放用）.
         private AsyncOperationHandle<GameObject> playerViewHandle;
-        private AsyncOperationHandle<GameObject> enemyViewHandle;
         private AsyncOperationHandle<GameObject> gameOverViewHandle;
 
         /// <summary>
@@ -98,10 +96,9 @@ namespace InGame.Player
         /// </summary>
         public async UniTask InitializePlayer(Vector3? spawnPos = null, string viewAddress=null)
         {
-            // PlayerView、EnemyView、GameOverViewを同時に読み込み.
+            // PlayerView、GameOverViewを同時に読み込み（EnemyViewはEnemyManagerが管理）.
             await UniTask.WhenAll(
                 InstantiateView("PlayerView"),
-                InstantiateEnemyView("EnemyView"),
                 InstantiateGameOverView("GameOverView")
             );
 
@@ -135,38 +132,6 @@ namespace InGame.Player
             var view = playerView.GetComponent<IPlayerView>();
             playerPresenter.GetView(view);
             playerPresenter.EventBattleView();
-        }
-
-        /// <summary>
-        /// EnemyView生成.
-        /// </summary>
-        /// <param name="viewAddress">EnemyViewのAddressableアドレス.</param>
-        private async UniTask InstantiateEnemyView(string viewAddress)
-        {
-            // 既存のハンドルを解放.
-            ReleaseEnemyView();
-
-            enemyViewHandle = Addressables.LoadAssetAsync<GameObject>(viewAddress);
-            GameObject prefab = await enemyViewHandle;
-
-            if (enemyViewHandle.Status != AsyncOperationStatus.Succeeded)
-            {
-                Debug.LogError($"EnemyView '{viewAddress}' の読み込みに失敗しました.");
-                return;
-            }
-
-            enemyView = Object.Instantiate(prefab);
-
-            // EnemyUI_View_SetterをEnemyUIViewにセット.
-            var setter = enemyView.GetComponent<EnemyUI_View_Setter>();
-            if (setter != null)
-            {
-                var enemyUIView = Object.FindFirstObjectByType<EnemyUIView>();
-                if (enemyUIView != null)
-                {
-                    enemyUIView.SetSetter = setter;
-                }
-            }
         }
 
         /// <summary>
@@ -233,23 +198,6 @@ namespace InGame.Player
         }
 
         /// <summary>
-        /// EnemyViewリソースを解放.
-        /// </summary>
-        private void ReleaseEnemyView()
-        {
-            if (enemyView != null)
-            {
-                Object.Destroy(enemyView);
-                enemyView = null;
-            }
-            if (enemyViewHandle.IsValid())
-            {
-                Addressables.Release(enemyViewHandle);
-                enemyViewHandle = default;
-            }
-        }
-
-        /// <summary>
         /// 外部からダメージを受ける（Enemy等から呼び出し用）.
         /// </summary>
         /// <param name="damageData">ダメージデータ.</param>
@@ -276,7 +224,6 @@ namespace InGame.Player
         {
             playerPresenter?.Dispose();
             ReleasePlayerView();
-            ReleaseEnemyView();
             ReleaseGameOverView();
             base.OnDestroy();
         }

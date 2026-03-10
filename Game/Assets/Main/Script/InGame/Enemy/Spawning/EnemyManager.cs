@@ -15,6 +15,14 @@ namespace InGame.Enemy
         private AsyncOperationHandle<GameObject> enemyHandle;
         private GameObject enemyInstance;
 
+        // EnemyView関連.
+        private AsyncOperationHandle<GameObject> enemyViewHandle;
+        private GameObject enemyViewInstance;
+
+        // EnemyUIView参照（EnemyPresenterから取得可能）.
+        private EnemyUIView enemyUIView;
+        public EnemyUIView EnemyUIView => enemyUIView;
+
         // 現在の敵インスタンス.
         public GameObject EnemyInstance => enemyInstance;
 
@@ -25,6 +33,10 @@ namespace InGame.Enemy
         {
             int enemyId = PlayerPrefs.GetInt("EnemyName", 0);
             EnemyName enemyName = (EnemyName)enemyId;
+
+            // 取得後に破棄.
+            PlayerPrefs.DeleteKey("EnemyName");
+            PlayerPrefs.Save();
 
             if (enemyName == EnemyName.None)
             {
@@ -44,6 +56,9 @@ namespace InGame.Enemy
             // 既存のハンドルを解放.
             ReleaseEnemy();
 
+            // EnemyViewを先にロードしてUIを準備.
+            await SetupEnemyView();
+
             enemyHandle = Addressables.LoadAssetAsync<GameObject>(enemyAddress);
             GameObject prefab = await enemyHandle;
 
@@ -55,12 +70,55 @@ namespace InGame.Enemy
 
             if (autoSpawn)
             {
-                var spawnPoint = GameObject.FindFirstObjectByType<EnemySpawnPointAttach>();
-                spawnPos = spawnPoint != null ? spawnPoint.transform.position : Vector3.zero;
+                spawnPos = EnemySpawnPointAttach.Instance().SpawnPosition;
             }
 
             if (!spawnPos.HasValue) spawnPos = Vector3.zero;
             enemyInstance = Object.Instantiate(prefab, spawnPos.Value, Quaternion.identity);
+            Debug.Log($"[EnemyManager] Enemy '{enemyAddress}' 生成完了 - EnemyUIView: {(enemyUIView != null ? "Ready" : "null")}");
+        }
+
+        /// <summary>
+        /// EnemyView（HP・名称のUIキャンバス）をロードしてEnemyUIViewを準備.
+        /// </summary>
+        private async UniTask SetupEnemyView()
+        {
+            // 既存のEnemyViewを解放.
+            ReleaseEnemyView();
+
+            enemyViewHandle = Addressables.LoadAssetAsync<GameObject>("EnemyView");
+            GameObject prefab = await enemyViewHandle;
+
+            if (enemyViewHandle.Status != AsyncOperationStatus.Succeeded)
+            {
+                Debug.LogError("[EnemyManager] EnemyView の読み込みに失敗しました.");
+                return;
+            }
+
+            enemyViewInstance = Object.Instantiate(prefab);
+
+            // EnemyUI_View_SetterをEnemyUIViewにセット.
+            var setter = enemyViewInstance.GetComponent<EnemyUI_View_Setter>();
+            if (setter == null)
+            {
+                setter = enemyViewInstance.GetComponentInChildren<EnemyUI_View_Setter>();
+            }
+
+            if (setter != null)
+            {
+                // EnemyUIViewがシーンになければ、EnemyView上に追加.
+                enemyUIView = Object.FindFirstObjectByType<EnemyUIView>();
+                if (enemyUIView == null)
+                {
+                    enemyUIView = enemyViewInstance.AddComponent<EnemyUIView>();
+                }
+                enemyUIView.SetSetter = setter;
+                Debug.Log($"[EnemyManager] EnemyUIView準備完了 - IsSetterReady: {enemyUIView.IsSetterReady}");
+            }
+            else
+            {
+                Debug.LogError("[EnemyManager] EnemyUI_View_Setter が EnemyView上に見つかりません.");
+            }
         }
 
         /// <summary>
@@ -78,6 +136,25 @@ namespace InGame.Enemy
                 Addressables.Release(enemyHandle);
                 enemyHandle = default;
             }
+            ReleaseEnemyView();
+        }
+
+        /// <summary>
+        /// EnemyViewリソースを解放.
+        /// </summary>
+        private void ReleaseEnemyView()
+        {
+            if (enemyViewInstance != null)
+            {
+                Object.Destroy(enemyViewInstance);
+                enemyViewInstance = null;
+            }
+            if (enemyViewHandle.IsValid())
+            {
+                Addressables.Release(enemyViewHandle);
+                enemyViewHandle = default;
+            }
+            enemyUIView = null;
         }
 
         private void OnDestroy()
