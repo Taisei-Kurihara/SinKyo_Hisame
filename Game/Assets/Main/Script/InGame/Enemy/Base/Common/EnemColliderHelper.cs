@@ -49,6 +49,9 @@ public static class EnemColliderHelper
 
         Transform ownerTransform = enemyModel.Presenter.transform;
 
+        // 攻撃中はレイヤーをDefaultに変更.
+        int originalLayer = SetAttackLayer(ownerTransform);
+
         // コライダー設定を生成.
         var colliderStatus = CreateColliderStatus(ownerTransform, config);
         var createdColliders = colliderStatus.CreateColliders();
@@ -61,6 +64,9 @@ public static class EnemColliderHelper
 
         // 破棄.
         CleanupColliders(colliderStatus, hitDetector);
+
+        // レイヤー復元.
+        RestoreLayer(ownerTransform, originalLayer);
 
         return EnemNullSafetyHelper.IsValid(enemyModel);
     }
@@ -82,6 +88,9 @@ public static class EnemColliderHelper
 
         Transform ownerTransform = enemyModel.Presenter.transform;
 
+        // 攻撃中はレイヤーをDefaultに変更.
+        int originalLayer = SetAttackLayer(ownerTransform);
+
         // コライダー設定を生成.
         var colliderStatus = CreateColliderStatus(ownerTransform, config);
         var createdColliders = colliderStatus.CreateColliders();
@@ -97,6 +106,9 @@ public static class EnemColliderHelper
 
         // 破棄.
         CleanupColliders(colliderStatus, hitDetector);
+
+        // レイヤー復元.
+        RestoreLayer(ownerTransform, originalLayer);
 
         return EnemNullSafetyHelper.IsValid(enemyModel);
     }
@@ -120,6 +132,27 @@ public static class EnemColliderHelper
         var hitDetector = ownerTransform.gameObject.AddComponent<EnemyAttackHitDetector>();
         hitDetector.Initialize(colliderState, existingColliders);
         return hitDetector;
+    }
+
+    /// <summary>
+    /// 攻撃開始時にレイヤーをDefaultに変更し、元のレイヤーを返す.
+    /// </summary>
+    public static int SetAttackLayer(Transform ownerTransform)
+    {
+        int originalLayer = ownerTransform.gameObject.layer;
+        ownerTransform.gameObject.layer = LayerMask.NameToLayer("Default");
+        return originalLayer;
+    }
+
+    /// <summary>
+    /// 攻撃終了時にレイヤーを復元する.
+    /// </summary>
+    public static void RestoreLayer(Transform ownerTransform, int originalLayer)
+    {
+        if (ownerTransform != null)
+        {
+            ownerTransform.gameObject.layer = originalLayer;
+        }
     }
 
     // コライダーステータスを生成する内部関数.

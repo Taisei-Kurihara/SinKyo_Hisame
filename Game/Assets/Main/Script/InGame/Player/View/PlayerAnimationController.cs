@@ -21,6 +21,12 @@ namespace InGame.Player.Animation
         // 入力ベースの向き（1f or -1f）. 物理反動では変化しない.
         private float facingSign = 1f;
 
+        // アクション（攻撃等）がanimator.speedを制御中かどうか.
+        private bool actionSpeedOverride = false;
+
+        // 基準歩行速度（PlayerStatusInitModel.speed）. 移動アニメ速度の正規化に使用.
+        private const float baseWalkSpeed = 7f;
+
 
         public void Awake()
         {
@@ -61,6 +67,20 @@ namespace InGame.Player.Animation
             else if (_move < -moveDeadZone) { moveState = -1; }
 
             animator.SetInteger(IsMoveHash, moveState);
+
+            // 移動速度に応じてアニメーション速度を変更（アクション中は除外）.
+            if (!actionSpeedOverride)
+            {
+                if (moveState != 0)
+                {
+                    float speedRatio = Mathf.Abs(_move) / baseWalkSpeed + 0.5f;
+                    animator.speed = Mathf.Clamp(speedRatio, 0.5f, 3.0f);
+                }
+                else
+                {
+                    animator.speed = 1.0f;
+                }
+            }
 
             // 向き反転は入力ベース（facingSign）で適用. 物理反動では変化しない.
             Vector3 scale = transform.localScale;
@@ -129,12 +149,21 @@ namespace InGame.Player.Animation
         }
 
         /// <summary>
-        /// アニメーション速度を設定.
+        /// アクション用アニメーション速度を設定（移動速度による自動調整を一時停止）.
         /// </summary>
         /// <param name="speed">速度倍率（1.0が通常速度）.</param>
         public void SetAnimatorSpeed(float speed)
         {
+            actionSpeedOverride = true;
             animator.speed = speed;
+        }
+
+        /// <summary>
+        /// アクション用アニメーション速度制御を解除し、移動速度による自動調整を再開.
+        /// </summary>
+        public void ClearActionAnimatorSpeed()
+        {
+            actionSpeedOverride = false;
         }
     }
 
@@ -150,5 +179,6 @@ namespace InGame.Player.Animation
         void PlayDead();
         void PlayTrigger(string triggerName);
         void SetAnimatorSpeed(float speed);
+        void ClearActionAnimatorSpeed();
     }
 }

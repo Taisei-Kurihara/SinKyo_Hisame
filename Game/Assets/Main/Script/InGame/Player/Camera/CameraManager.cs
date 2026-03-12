@@ -25,12 +25,11 @@ namespace Common
 
         // カメラ境界設定.
         private bool hasBounds = false;
+        private bool boundsInitialized = false;
         private float boundsMinX;
         private float boundsMaxX;
-
-        // カメラ境界の外側余白（左右それぞれこの値分だけステージ外まで写す）.
-        [SerializeField]
-        private float boundsMargin = 1.2f;
+        private float boundsMinY;
+        private float boundsMaxY;
 
         // シェイク設定
         private bool isShaking = false;
@@ -55,8 +54,13 @@ namespace Common
 
         void LateUpdate()
         {
+            // マーカーが見つかるまで毎フレーム試行.
+            if (!boundsInitialized)
+            {
+                ApplyBoundsFromMarkers();
+            }
+
             if (mainCamera == null || followerObject == null) return;
-            
 
             if (isFollowing)
             {
@@ -66,6 +70,7 @@ namespace Common
                 if (hasBounds)
                 {
                     targetPos.x = Mathf.Clamp(targetPos.x, boundsMinX, boundsMaxX);
+                    targetPos.y = Mathf.Clamp(targetPos.y, boundsMinY, boundsMaxY);
                 }
 
                 // スムーズに追従.
@@ -77,31 +82,111 @@ namespace Common
             }
         }
         #region カメラ境界
+
         /// <summary>
-        /// ステージ端からカメラ表示範囲の半分を内側に制限する境界を設定.
+        /// StageBoundsMarker と CameraBoundsUI からカメラ境界を計算して適用する.
         /// </summary>
-        /// <param name="stageMinX">ステージ左端.</param>
-        /// <param name="stageMaxX">ステージ右端.</param>
-        public void SetBounds(float stageMinX, float stageMaxX)
+        public void ApplyBoundsFromMarkers()
         {
             if (mainCamera == null) return;
 
-            // カメラ表示幅の半分を算出.
+            // Current は自動生成せずシーン配置のインスタンスのみ返す.
+            var stageMarker = StageBoundsMarker.Current;
+            if (stageMarker == null) return;
+
+            // カメラ表示サイズの半分を算出.
             float halfWidth;
+            float halfHeight;
             if (mainCamera.orthographic)
             {
-                halfWidth = mainCamera.orthographicSize * mainCamera.aspect;
+                halfHeight = mainCamera.orthographicSize;
+                halfWidth = halfHeight * mainCamera.aspect;
             }
             else
             {
-                // Perspective: offset.zの距離でのビュー幅を算出.
                 float distance = Mathf.Abs(offset.z);
-                halfWidth = distance * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad) * mainCamera.aspect;
+                halfHeight = distance * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
+                halfWidth = halfHeight * mainCamera.aspect;
             }
 
-            boundsMinX = stageMinX + halfWidth - boundsMargin;
-            boundsMaxX = stageMaxX - halfWidth + boundsMargin;
-            hasBounds = true;
+            // ステージ端を取得.
+            float stageLeftX = stageMarker.LeftX;
+            float stageRightX = stageMarker.RightX;
+            float stageBottomY = stageMarker.BottomY;
+            float stageTopY = stageMarker.TopY;
+
+            // CameraBoundsUI から Viewport Inset を取得 (未配置なら inset=0).
+            var boundsUI = CameraBoundsUI.Current;
+
+            float leftInset = 0f;
+            float rightInset = 0f;
+            float bottomInset = 0f;
+            float topInset = 0f;
+
+            if (boundsUI != null)
+            {
+                // Viewport 座標からインセット計算.
+                // Bottom: inner edge の viewport Y (0=画面下端).
+                if (boundsUI.IsBottomEnabled)
+                    bottomInset = boundsUI.GetBottomInnerViewportY();
+                // Top: 1 - inner edge の viewport Y (0=画面上端).
+                if (boundsUI.IsTopEnabled)
+                    topInset = 1f - boundsUI.GetTopInnerViewportY();
+                // Left: inner edge の viewport X (0=画面左端).
+                if (boundsUI.IsLeftEnabled)
+                    leftInset = boundsUI.GetLeftInnerViewportX();
+                // Right: 1 - inner edge の viewport X (0=画面右端).
+                if (boundsUI.IsRightEnabled)
+                    rightInset = 1f - boundsUI.GetRightInnerViewportX();
+            }
+
+            // 各辺の境界を計算.
+            // inset=0: カメラ端 = ステージ端.
+            // inset>0: ステージ端がスクリーン内側に表示 (UIバーが外側を覆う).
+            bool hasAnyBound = false;
+
+            if (boundsUI == null || boundsUI.IsLeftEnabled)
+            {
+                boundsMinX = stageLeftX + halfWidth * (1f - 2f * leftInset);
+                hasAnyBound = true;
+            }
+            else
+            {
+                boundsMinX = float.MinValue;
+            }
+
+            if (boundsUI == null || boundsUI.IsRightEnabled)
+            {
+                boundsMaxX = stageRightX - halfWidth * (1f - 2f * rightInset);
+                hasAnyBound = true;
+            }
+            else
+            {
+                boundsMaxX = float.MaxValue;
+            }
+
+            if (boundsUI == null || boundsUI.IsBottomEnabled)
+            {
+                boundsMinY = stageBottomY + halfHeight * (1f - 2f * bottomInset);
+                hasAnyBound = true;
+            }
+            else
+            {
+                boundsMinY = float.MinValue;
+            }
+
+            if (boundsUI == null || boundsUI.IsTopEnabled)
+            {
+                boundsMaxY = stageTopY - halfHeight * (1f - 2f * topInset);
+                hasAnyBound = true;
+            }
+            else
+            {
+                boundsMaxY = float.MaxValue;
+            }
+
+            hasBounds = hasAnyBound;
+            boundsInitialized = true;
         }
 
         /// <summary>

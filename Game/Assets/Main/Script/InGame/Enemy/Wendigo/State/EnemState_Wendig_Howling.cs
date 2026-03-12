@@ -8,14 +8,20 @@ public class EnemState_Wendig_Howling : EnemState_abstract
     private float attackMultiplier = 1.8f;
     private float attackRadius = 3f;
 
-    public override async UniTask Act(EnemyModel_abstract enemyModel)
-    {
-        Debug.Log($"[EnemState_Wendig_Howling] Act開始");
+    // ライフサイクル間共有データ.
+    private int attackDamage;
 
-        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) return;
+    public EnemState_Wendig_Howling()
+    {
+        postActionWaitFrames = 60;
+    }
+
+    protected override async UniTask OnPreAction(EnemyModel_abstract enemyModel)
+    {
+        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
 
         // 現在の攻撃力から実ダメージを計算.
-        int attackDamage = 90;
+        attackDamage = 90;
         if (enemyModel is EnemyModel_Wendig wendigModel)
         {
             attackDamage = (int)(wendigModel.GetCurrentAttackPower() * attackMultiplier);
@@ -28,9 +34,15 @@ public class EnemState_Wendig_Howling : EnemState_abstract
 
         // === 前段階 ===.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
-            enemyModel, 500f, false, 300f, animSpeed)) return;
+            enemyModel, 500f, false, 300f, animSpeed)) { isAborted = true; return; }
+    }
 
-        // === 攻撃中 ===.
+    protected override async UniTask OnAction(EnemyModel_abstract enemyModel)
+    {
+        if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
+
+        float animSpeed = enemyModel.AnimSpeed;
+
         // 円形の攻撃判定を生成し400ms維持.
         var colliderState = new EnemColliderState_Wendig_Howling();
         colliderState.SetDamage(attackDamage);
@@ -48,14 +60,14 @@ public class EnemState_Wendig_Howling : EnemState_abstract
                 colliderState = colliderState
             },
             400f, animSpeed);
+    }
 
-        // === 攻撃後 ===.
-        // Howling_End トリガー実行.
+    protected override async UniTask OnAfterPostAction(EnemyModel_abstract enemyModel)
+    {
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
             enemyModel.Animator.SetTrigger("Howling_End");
         }
-
-        Debug.Log($"[EnemState_Wendig_Howling] Act完了");
+        await UniTask.CompletedTask;
     }
 }
