@@ -1,9 +1,12 @@
 using UnityEngine;
 using Common;
 
-// Canvas上のカメラ制限UIマーカー.
-// 4つのRectTransform (Image付き) でカメラ制限のスクリーン位置を定義する.
-// 各辺の Inner Edge がステージ端と一致するようにカメラが制限される.
+/// <summary>
+/// Canvas上のカメラ制限UIマーカー.
+/// 4つのRectTransform (Image付き) でカメラ制限のスクリーン位置を定義する.
+/// 各辺の Inner Edge がステージ端と一致するようにカメラが制限される.
+/// Awake時にViewport Inset値をキャッシュし、不要なマーカーを削除する.
+/// </summary>
 public class CameraBoundsUI : SingletonMonoBase<CameraBoundsUI>
 {
     [System.Serializable]
@@ -22,49 +25,94 @@ public class CameraBoundsUI : SingletonMonoBase<CameraBoundsUI>
     [Header("右")]
     [SerializeField] private SideConfig right = new SideConfig();
 
-    // Inner Edge 用のワーク配列.
+    [Header("設定")]
+    [SerializeField] private bool destroyMarkersAfterRead = true;
+
+    // キャッシュ値.
+    private bool cachedTopEnabled;
+    private bool cachedBottomEnabled;
+    private bool cachedLeftEnabled;
+    private bool cachedRightEnabled;
+    private float cachedTopInnerViewportY;
+    private float cachedBottomInnerViewportY;
+    private float cachedLeftInnerViewportX;
+    private float cachedRightInnerViewportX;
+
+    // Inner Edge 計算用ワーク配列.
     private Vector3[] corners = new Vector3[4];
+
+    // 自動生成ではなくシーン配置のインスタンスのみ返す.
+    public static CameraBoundsUI Current => instance;
+
+    public bool IsTopEnabled => cachedTopEnabled;
+    public bool IsBottomEnabled => cachedBottomEnabled;
+    public bool IsLeftEnabled => cachedLeftEnabled;
+    public bool IsRightEnabled => cachedRightEnabled;
+
+    public float GetTopInnerViewportY() => cachedTopInnerViewportY;
+    public float GetBottomInnerViewportY() => cachedBottomInnerViewportY;
+    public float GetLeftInnerViewportX() => cachedLeftInnerViewportX;
+    public float GetRightInnerViewportX() => cachedRightInnerViewportX;
 
     private void Awake()
     {
         instance = this;
-    }
 
-    public bool IsTopEnabled => top.enabled && top.marker != null;
-    public bool IsBottomEnabled => bottom.enabled && bottom.marker != null;
-    public bool IsLeftEnabled => left.enabled && left.marker != null;
-    public bool IsRightEnabled => right.enabled && right.marker != null;
+        // 有効フラグをキャッシュ.
+        cachedTopEnabled = top.enabled && top.marker != null;
+        cachedBottomEnabled = bottom.enabled && bottom.marker != null;
+        cachedLeftEnabled = left.enabled && left.marker != null;
+        cachedRightEnabled = right.enabled && right.marker != null;
 
-    // Bottom の Inner Edge (上端) の Viewport Y を返す.
-    // RectTransform の corners: [0]=左下, [1]=左上, [2]=右上, [3]=右下.
-    public float GetBottomInnerViewportY()
-    {
-        if (!IsBottomEnabled) return 0f;
-        bottom.marker.GetWorldCorners(corners);
-        return corners[1].y / Screen.height;
-    }
+        // RectTransform の World Corners から Viewport Inset をキャッシュ.
+        // corners: [0]=左下, [1]=左上, [2]=右上, [3]=右下.
+        if (cachedTopEnabled)
+        {
+            top.marker.GetWorldCorners(corners);
+            cachedTopInnerViewportY = corners[0].y / Screen.height;
+        }
+        else
+        {
+            cachedTopInnerViewportY = 1f;
+        }
 
-    // Top の Inner Edge (下端) の Viewport Y を返す.
-    public float GetTopInnerViewportY()
-    {
-        if (!IsTopEnabled) return 1f;
-        top.marker.GetWorldCorners(corners);
-        return corners[0].y / Screen.height;
-    }
+        if (cachedBottomEnabled)
+        {
+            bottom.marker.GetWorldCorners(corners);
+            cachedBottomInnerViewportY = corners[1].y / Screen.height;
+        }
+        else
+        {
+            cachedBottomInnerViewportY = 0f;
+        }
 
-    // Left の Inner Edge (右端) の Viewport X を返す.
-    public float GetLeftInnerViewportX()
-    {
-        if (!IsLeftEnabled) return 0f;
-        left.marker.GetWorldCorners(corners);
-        return corners[2].x / Screen.width;
-    }
+        if (cachedLeftEnabled)
+        {
+            left.marker.GetWorldCorners(corners);
+            cachedLeftInnerViewportX = corners[2].x / Screen.width;
+        }
+        else
+        {
+            cachedLeftInnerViewportX = 0f;
+        }
 
-    // Right の Inner Edge (左端) の Viewport X を返す.
-    public float GetRightInnerViewportX()
-    {
-        if (!IsRightEnabled) return 1f;
-        right.marker.GetWorldCorners(corners);
-        return corners[0].x / Screen.width;
+        if (cachedRightEnabled)
+        {
+            right.marker.GetWorldCorners(corners);
+            cachedRightInnerViewportX = corners[0].x / Screen.width;
+        }
+        else
+        {
+            cachedRightInnerViewportX = 1f;
+        }
+
+        // 不要なマーカーを削除.
+        if (destroyMarkersAfterRead)
+        {
+            if (top.marker != null) Destroy(top.marker.gameObject);
+            if (bottom.marker != null) Destroy(bottom.marker.gameObject);
+            if (left.marker != null) Destroy(left.marker.gameObject);
+            if (right.marker != null) Destroy(right.marker.gameObject);
+        }
     }
 }

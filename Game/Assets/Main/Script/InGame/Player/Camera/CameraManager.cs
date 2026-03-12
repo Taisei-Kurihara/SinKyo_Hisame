@@ -25,6 +25,7 @@ namespace Common
 
         // カメラ境界設定.
         private bool hasBounds = false;
+        private bool boundsInitialized = false;
         private float boundsMinX;
         private float boundsMaxX;
         private float boundsMinY;
@@ -51,15 +52,15 @@ namespace Common
             }
         }
 
-        void Start()
-        {
-            ApplyBoundsFromMarkers();
-        }
-
         void LateUpdate()
         {
-            if (mainCamera == null || followerObject == null) return;
+            // マーカーが見つかるまで毎フレーム試行.
+            if (!boundsInitialized)
+            {
+                ApplyBoundsFromMarkers();
+            }
 
+            if (mainCamera == null || followerObject == null) return;
 
             if (isFollowing)
             {
@@ -89,12 +90,9 @@ namespace Common
         {
             if (mainCamera == null) return;
 
-            var stageMarker = StageBoundsMarker.Instance(false);
-            if (stageMarker == null)
-            {
-                hasBounds = false;
-                return;
-            }
+            // Current は自動生成せずシーン配置のインスタンスのみ返す.
+            var stageMarker = StageBoundsMarker.Current;
+            if (stageMarker == null) return;
 
             // カメラ表示サイズの半分を算出.
             float halfWidth;
@@ -118,7 +116,7 @@ namespace Common
             float stageTopY = stageMarker.TopY;
 
             // CameraBoundsUI から Viewport Inset を取得 (未配置なら inset=0).
-            var boundsUI = CameraBoundsUI.Instance(false);
+            var boundsUI = CameraBoundsUI.Current;
 
             float leftInset = 0f;
             float rightInset = 0f;
@@ -188,6 +186,7 @@ namespace Common
             }
 
             hasBounds = hasAnyBound;
+            boundsInitialized = true;
         }
 
         /// <summary>
