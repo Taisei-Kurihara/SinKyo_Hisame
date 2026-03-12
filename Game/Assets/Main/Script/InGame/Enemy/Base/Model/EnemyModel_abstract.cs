@@ -6,10 +6,27 @@ public abstract class EnemyModel_abstract : MonoBehaviour
     protected EnemyPresenter_abstract presenter = null;
     public EnemyPresenter_abstract Presenter { get => presenter; set { if( presenter == null) presenter = value; } }
 
-    protected Vector2 stageMin = new Vector2(-13f, 0f);
-    protected Vector2 stageMax = new Vector2(13f, 0f);
-    public Vector2 StageMin => stageMin;
-    public Vector2 StageMax => stageMax;
+    // フォールバック値.
+    private static readonly Vector2 defaultStageMin = new Vector2(-13f, -5f);
+    private static readonly Vector2 defaultStageMax = new Vector2(13f, 0.5f);
+
+    // EnemyStageBoundsMarker があればそちらを参照、なければフォールバック.
+    public Vector2 StageMin
+    {
+        get
+        {
+            var marker = EnemyStageBoundsMarker.Instance(false);
+            return marker != null ? marker.StageMin : defaultStageMin;
+        }
+    }
+    public Vector2 StageMax
+    {
+        get
+        {
+            var marker = EnemyStageBoundsMarker.Instance(false);
+            return marker != null ? marker.StageMax : defaultStageMax;
+        }
+    }
 
     protected Animator animator;
     public Animator Animator => animator;
