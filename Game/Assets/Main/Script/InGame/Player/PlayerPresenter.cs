@@ -156,8 +156,8 @@ namespace InGame.Player
                     // Jak連撃コンボタイムアウトチェック（アクション中でない時のみ）.
                     if (jakComboCount > 0 && playerModel.enableAction == false && UnityEngine.Time.time - jakLastAttackTime > jakComboResetTime)
                     {
-                        // アニメーション速度を通常に戻す.
-                        playerAnimation?.SetAnimatorSpeed(1.0f);
+                        // アニメーション速度制御を解除（移動速度による自動調整を再開）.
+                        playerAnimation?.ClearActionAnimatorSpeed();
                         playerAnimation?.PlayTrigger("Jak_End");
                         jakComboCount = 0;
                     }
@@ -578,8 +578,8 @@ namespace InGame.Player
             // アニメーション完了を待機（27倍速のため短時間で終了）.
             await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration / 27.0f));
 
-            // アニメーション速度を通常に戻す.
-            playerAnimation?.SetAnimatorSpeed(1.0f);
+            // アニメーション速度制御を解除（移動速度による自動調整を再開）.
+            playerAnimation?.ClearActionAnimatorSpeed();
 
             // 居合攻撃の持続時間が終わるまで入力不可を維持.
             await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration - iaiDuration / 27.0f));
@@ -610,8 +610,8 @@ namespace InGame.Player
             // 終了後0.1秒間を開ける.
             await UniTask.Delay(TimeSpan.FromSeconds(0.1f));
 
-            // アニメーション速度を通常に戻す.
-            playerAnimation?.SetAnimatorSpeed(1.0f);
+            // アニメーション速度制御を解除（移動速度による自動調整を再開）.
+            playerAnimation?.ClearActionAnimatorSpeed();
 
             playerModel.SetEnableAction(false);
         }
@@ -658,8 +658,8 @@ namespace InGame.Player
             float cooldownRate = pulseModel.GetActionCooldownRate();
             await UniTask.Delay(TimeSpan.FromSeconds(attackDuration * cooldownRate));
 
-            // アニメーション速度を通常に戻す.
-            playerAnimation?.SetAnimatorSpeed(1.0f);
+            // アニメーション速度制御を解除（移動速度による自動調整を再開）.
+            playerAnimation?.ClearActionAnimatorSpeed();
 
             // 攻撃終了時刻を記録（ここから1/3秒以内に再入力で次のコンボ）.
             jakLastAttackTime = UnityEngine.Time.time;
@@ -728,8 +728,8 @@ namespace InGame.Player
         {
             if (jakComboCount > 0)
             {
-                // アニメーション速度を通常に戻す.
-                playerAnimation?.SetAnimatorSpeed(1.0f);
+                // アニメーション速度制御を解除（移動速度による自動調整を再開）.
+                playerAnimation?.ClearActionAnimatorSpeed();
                 playerAnimation?.PlayTrigger("Jak_End");
                 jakComboCount = 0;
             }
@@ -785,13 +785,8 @@ namespace InGame.Player
             var enemies = UnityEngine.Object.FindObjectsByType<EnemyPresenter_abstract>(FindObjectsSortMode.None);
             var sceneChangeStand = SceneChangeStand.Instance();
 
-            // 敵のステージ端情報からカメラ境界を設定.
-            if (enemies.Length > 0 && enemies[0].Model != null)
-            {
-                var stageMin = enemies[0].Model.StageMin;
-                var stageMax = enemies[0].Model.StageMax;
-                CameraManager.Instance(false)?.SetBounds(stageMin.x, stageMax.x);
-            }
+            // カメラ境界はStageBoundsMarker + CameraBoundsUI ベースに移行.
+            // CameraManager.Start() で自動適用される.
 
             foreach (var enemy in enemies)
             {
