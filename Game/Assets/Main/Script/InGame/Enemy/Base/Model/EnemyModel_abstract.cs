@@ -15,7 +15,7 @@ public abstract class EnemyModel_abstract : MonoBehaviour
     {
         get
         {
-            var marker = EnemyStageBoundsMarker.Instance(false);
+            var marker = EnemyStageBoundsMarker.Current;
             return marker != null ? marker.StageMin : defaultStageMin;
         }
     }
@@ -23,7 +23,7 @@ public abstract class EnemyModel_abstract : MonoBehaviour
     {
         get
         {
-            var marker = EnemyStageBoundsMarker.Instance(false);
+            var marker = EnemyStageBoundsMarker.Current;
             return marker != null ? marker.StageMax : defaultStageMax;
         }
     }
