@@ -93,17 +93,28 @@ namespace InGame.Player
 
         /// <summary>
         /// キャラクター生成とView生成を呼び出す.
+        /// View読み込みが失敗してもステータス初期化とプレイヤー有効化は必ず実行する.
         /// </summary>
         public async UniTask InitializePlayer(Vector3? spawnPos = null, string viewAddress=null)
         {
-            // PlayerView、GameOverViewを同時に読み込み（EnemyViewはEnemyManagerが管理）.
-            await UniTask.WhenAll(
-                InstantiateView("PlayerView"),
-                InstantiateGameOverView("GameOverView")
-            );
+            // PlayerView、GameOverViewを同時に読み込み（失敗しても初期化は継続）.
+            try
+            {
+                await UniTask.WhenAll(
+                    InstantiateView("PlayerView"),
+                    InstantiateGameOverView("GameOverView")
+                );
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[PlayerScope] View読み込み中にエラーが発生しましたが、初期化を継続します: {e.Message}");
+            }
 
             // GameOverViewの参照をPlayerPresenterに設定.
             playerPresenter.SetGameOverView(GameOverView);
+
+            // ステータスを初期化.
+            playerControllModel.Initialize();
 
             playerPresenter.SetPlayerEnable(true);
         }

@@ -366,6 +366,7 @@ GameObject:
   - component: {fileID: 4456401617419860409}
   - component: {fileID: 2250027557523056389}
   - component: {fileID: 4312146636866330261}
+  - component: {fileID: 2197263821404934766}
   m_Layer: 6
   m_Name: PlayerObject
   m_TagString: Player
@@ -590,6 +591,25 @@ MonoBehaviour:
     TypeName: 
   autoRun: 1
   autoInjectGameObjects: []
+--- !u!251 &2197263821404934766
+PlatformEffector2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4751940697145242504}
+  m_Enabled: 1
+  m_UseColliderMask: 0
+  m_ColliderMask:
+    serializedVersion: 2
+    m_Bits: 512
+  m_RotationalOffset: 0
+  m_UseOneWay: 1
+  m_UseOneWayGrouping: 0
+  m_SurfaceArc: 180
+  m_UseSideFriction: 0
+  m_UseSideBounce: 0
+  m_SideArc: 1
 --- !u!1 &8317575028780967119
 GameObject:
   m_ObjectHideFlags: 0

@@ -215,8 +215,25 @@ namespace Common
             }
             else
             {
-                _manager._mainSceneInfo.Init().Forget();
+                // LoadMainSceneと同じ順序で初期化（InputStart→Init）.
                 _manager._mainSceneInfo.InputStart();
+                _manager.InitSceneAsync(_manager._mainSceneInfo).Forget();
+            }
+        }
+
+        /// <summary>
+        /// シーン初期化の非同期処理（エラーハンドリング付き）.
+        /// LoadMainSceneのfinally内と同等の処理を行う.
+        /// </summary>
+        private async UniTaskVoid InitSceneAsync(ISceneInfo sceneInfo)
+        {
+            try
+            {
+                await sceneInfo.Init();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[SceneManager] 初期シーンInit()で例外発生: {sceneInfo.GetType().Name} | {e}");
             }
         }
 
