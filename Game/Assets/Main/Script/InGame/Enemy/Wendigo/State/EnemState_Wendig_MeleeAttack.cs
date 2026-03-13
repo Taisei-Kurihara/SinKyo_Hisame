@@ -37,6 +37,8 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
         colliderState.ClearHitTargets();
         colliderState.SetDamage(attackDamage);
 
+        // 前回のAttack_Endトリガーが残留している場合に備えてリセット.
+        enemyModel.Animator.ResetTrigger("Attack_End");
         enemyModel.Animator.SetTrigger("Attack");
 
         // === 前段階 ===.
@@ -78,6 +80,7 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
     {
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
+            enemyModel.Animator.ResetTrigger("Attack");
             enemyModel.Animator.SetTrigger("Attack_End");
         }
         await UniTask.CompletedTask;

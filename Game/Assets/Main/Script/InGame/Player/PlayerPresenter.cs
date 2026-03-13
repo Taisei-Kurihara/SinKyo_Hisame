@@ -274,11 +274,15 @@ namespace InGame.Player
                         }
                     }
                 }
+                // Platformすり抜け（下方向入力0.5以上でPlatform上にいる場合）.
+                if (moveInput.y < -0.5f && playerModel.PlatformDetector.IsOnPlatform)
+                {
+                    playerModel.OnDropThroughPlatform();
+                }
                 // ジャンプ.
                 if (inputActions.CharacterController.Jump.WasPressedThisFrame())
                 {
                     EndJakComboIfActive();
-                    //Debug.Log("[PlayerPresenter] Jump button pressed");
                     playerModel.OnJumpEvent();
                 }
 

@@ -16,6 +16,7 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
     private EnemState_Wendig_Rush rushState = new EnemState_Wendig_Rush();
     private EnemState_Wendig_Howling howlingState = new EnemState_Wendig_Howling();
     private EnemState_Wendig_TripleAttack tripleAttackState = new EnemState_Wendig_TripleAttack();
+    private EnemState_Wendig_JumpSlash jumpSlashState = new EnemState_Wendig_JumpSlash();
 
     // State取得用プロパティ.
     public EnemState_Wendig_Howling HowlingState => howlingState;
@@ -114,6 +115,18 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
             shouldActivate = true
         });
 
+        // とびかかり切り攻撃設定（移動なし、直接ジャンプ）.
+        AddActionSetting(new EnemAIActionSetting
+        {
+            actionState = jumpSlashState,
+            repeatableCount = -1,
+            activationDistance = 15f,
+            moveStartDistance = 15f,
+            activationWeight = 1.5f,
+            moveState = null,
+            shouldActivate = true
+        });
+
         isInitialized = true;
     }
 
@@ -178,19 +191,49 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
             return;
         }
 
-        // カメラ範囲外にいる場合は優先的にカメラ内へ移動.
-        if (IsOutsideCameraView(targetPos))
+        // カメラ範囲外にいる場合の処理.
+        bool isOffScreen = IsOutsideCameraView(targetPos);
+        if (isOffScreen)
         {
-            Debug.Log($"[EnemAIModel_Wendig_Normal] カメラ範囲外 - カメラ内へ移動");
-            await MoveToCameraView(targetPos);
+            // とびかかり切り条件チェック（プレイヤーが1.5ユニット以上高い位置）.
+            float yDiffForCamera = ownerTransform != null ? TargetPosition.y - ownerTransform.position.y : 0f;
+            if (yDiffForCamera >= 1.5f)
+            {
+                // 画面外 + とびかかり切り条件成立 → カメラ内移動をスキップ.
+                Debug.Log($"[EnemAIModel_Wendig_Normal] カメラ範囲外だがとびかかり切り条件成立 - カメラ内移動スキップ");
+            }
+            else
+            {
+                Debug.Log($"[EnemAIModel_Wendig_Normal] カメラ範囲外 - カメラ内へ移動");
+                await MoveToCameraView(targetPos);
+            }
         }
 
-        // アクション選択と実行.
-        EnemAIActionSetting selectedSetting = SelectActionByDistanceWithRestrictions(distance);
+        // アクション選択と実行（画面外距離を渡して確率ブースト）.
+        float offScreenDist = 0f;
+        if (isOffScreen && ownerTransform != null)
+        {
+            float dX = Mathf.Abs(ownerTransform.position.x - targetPos.x) - cameraViewRangeX;
+            float dY = Mathf.Abs(ownerTransform.position.y - targetPos.y) - cameraViewRangeY;
+            offScreenDist = Mathf.Max(dX, dY, 0f);
+        }
+        EnemAIActionSetting selectedSetting = SelectActionByDistanceWithRestrictions(distance, offScreenDist);
 
         if (selectedSetting != null)
         {
             currentActionSetting = selectedSetting;
+
+            // とびかかり切り攻撃の場合.
+            if (selectedSetting.actionState is EnemState_Wendig_JumpSlash jumpSlash)
+            {
+                jumpSlash.SetTargetPosition(targetPos);
+                await selectedSetting.actionState.Act(ownerModel);
+                selectedSetting.ConsumeRepeat();
+                randomMoveCount = 0;
+                Debug.Log($"[EnemAIModel_Wendig_Normal] とびかかり切り完了");
+                currentActionSetting = null;
+                return;
+            }
 
             // 突進攻撃の場合.
             if (selectedSetting.actionState is EnemState_Wendig_Rush rush)
@@ -432,16 +475,32 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
     }
 
     // 制限付きでアクションを選択（発動距離内）.
-    private EnemAIActionSetting SelectActionByDistanceWithRestrictions(float distance)
+    // offScreenDistance: 画面外の距離（0=画面内、大きいほど画面外で遠い）.
+    private EnemAIActionSetting SelectActionByDistanceWithRestrictions(float distance, float offScreenDistance = 0f)
     {
         int effectiveMinMelee = isAngry ? 0 : minRandomMovesBeforeMelee;
         var activatableActions = new List<EnemAIActionSetting>();
+        var actionWeights = new List<float>();
         float totalWeight = 0f;
 
         foreach (var setting in actionSettings)
         {
             if (!setting.CanActivate()) continue;
-            if (distance > setting.activationDistance) continue;
+
+            bool isJumpSlash = setting.actionState is EnemState_Wendig_JumpSlash;
+
+            // とびかかり切りは画面外でも距離制限を無視.
+            if (!isJumpSlash && distance > setting.activationDistance) continue;
+
+            // とびかかり切りの制限: プレイヤーが自身より1.5ユニット以上高い場合のみ.
+            if (isJumpSlash)
+            {
+                float yDiff = TargetPosition.y - ownerTransform.position.y;
+                if (yDiff < 1.5f)
+                {
+                    continue;
+                }
+            }
 
             // 突進攻撃の制限チェック.
             if (setting.actionState is EnemState_Wendig_Rush)
@@ -463,8 +522,17 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
                 }
             }
 
+            // 重み計算: とびかかり切りは画面外距離に応じてブースト.
+            float weight = setting.activationWeight;
+            if (isJumpSlash && offScreenDistance > 0f)
+            {
+                // 画面外1ユニットにつき重み+1（遠いほど高確率）.
+                weight += offScreenDistance;
+            }
+
             activatableActions.Add(setting);
-            totalWeight += setting.activationWeight;
+            actionWeights.Add(weight);
+            totalWeight += weight;
         }
 
         if (activatableActions.Count == 0) return null;
@@ -473,12 +541,12 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
         float randomValue = Random.Range(0f, totalWeight);
         float currentWeight = 0f;
 
-        foreach (var setting in activatableActions)
+        for (int i = 0; i < activatableActions.Count; i++)
         {
-            currentWeight += setting.activationWeight;
+            currentWeight += actionWeights[i];
             if (randomValue <= currentWeight)
             {
-                return setting;
+                return activatableActions[i];
             }
         }
 
@@ -498,6 +566,16 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
             if (distance <= setting.activationDistance) continue;
             if (distance > setting.moveStartDistance) continue;
             if (setting.moveState == null) continue;
+
+            // とびかかり切りの制限: プレイヤーが自身より1.5ユニット以上高い場合のみ.
+            if (setting.actionState is EnemState_Wendig_JumpSlash)
+            {
+                float yDiff = TargetPosition.y - ownerTransform.position.y;
+                if (yDiff < 1.5f)
+                {
+                    continue;
+                }
+            }
 
             // 突進攻撃の制限チェック.
             if (setting.actionState is EnemState_Wendig_Rush)
