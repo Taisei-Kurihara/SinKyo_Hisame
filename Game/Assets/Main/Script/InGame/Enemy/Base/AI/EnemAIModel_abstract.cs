@@ -228,6 +228,22 @@ public abstract class EnemAIModel_abstract
         Debug.Log($"[EnemAIModel_abstract] Updater切り替え要求: {updater.GetType().Name} → {newUpdater.GetType().Name}");
     }
 
+    // --- ミッションタグ ---
+
+    /// <summary>現在のミッションタグ（難易度等）.</summary>
+    protected MissionTag missionTags = MissionTag.None;
+    public MissionTag MissionTags => missionTags;
+
+    /// <summary>
+    /// ミッションタグを設定. StartLoop前に呼ぶ.
+    /// 子クラスで難易度に応じたパラメータ調整を行う.
+    /// </summary>
+    public virtual void ApplyMissionTags(MissionTag tags)
+    {
+        missionTags = tags;
+        Debug.Log($"[EnemAIModel] MissionTags設定: {tags}");
+    }
+
     // アクション設定を追加.
     public void AddActionSetting(EnemAIActionSetting setting)
     {

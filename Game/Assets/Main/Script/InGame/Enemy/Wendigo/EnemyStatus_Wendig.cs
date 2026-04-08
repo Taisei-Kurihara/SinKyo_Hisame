@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using InGame.Enemy;
 using UnityEngine;
 
 // EnemyStatus_abstractを継承したWendig用ステータス.
@@ -24,10 +25,23 @@ public class EnemyStatus_Wendig : EnemyStatus_abstract
     {
         Debug.Log($"[EnemyStatus_Wendig] Init - {gameObject.name}");
         wendigModel = GetComponent<EnemyModel_Wendig>();
-        // Wendig HPを20000に設定（全フェーズ合計）.
-        maxhp = 20000f;
+
+        // 難易度に応じたHP倍率（EnemyManagerからMissionTags取得）.
+        var missionTags = EnemyManager.Instance(false).CurrentMissionTags;
+        float hpMultiplier = 1f;
+        if ((missionTags & MissionTag.Difficulty_Easy) != 0)
+        {
+            hpMultiplier = 0.6f;
+        }
+        else if ((missionTags & MissionTag.Difficulty_Hard) != 0)
+        {
+            hpMultiplier = 1.5f;
+        }
+
+        // Wendig HP設定（全フェーズ合計 = (7500+12500) × 倍率）.
+        maxhp = 20000f * hpMultiplier;
         hp.Value = maxhp;
-        Debug.Log($"[EnemyStatus_Wendig] Init完了 - HP:{maxhp}");
+        Debug.Log($"[EnemyStatus_Wendig] Init完了 - HP:{maxhp} (倍率:{hpMultiplier})");
     }
 
     private void Start()
