@@ -152,6 +152,53 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
         CurrentUpdater?.IncreaseAngerGauge(amount);
     }
 
+    // === ミッションタグ（難易度）反映 ===
+
+    /// <summary>
+    /// 難易度に応じてHPフェーズを再設定する.
+    /// EnemyModel_Wendig.EnemAIStart()からStartLoop前に呼ばれる.
+    /// </summary>
+    public override void ApplyMissionTags(MissionTag tags)
+    {
+        base.ApplyMissionTags(tags);
+
+        // 難易度に応じたHP倍率.
+        float hpMultiplier = 1f;
+        if ((tags & MissionTag.Difficulty_Easy) != 0)
+        {
+            hpMultiplier = 0.6f;
+        }
+        else if ((tags & MissionTag.Difficulty_Hard) != 0)
+        {
+            hpMultiplier = 1.5f;
+        }
+        // Difficulty_Normal or None → 1.0（デフォルト）.
+
+        // HPフェーズを難易度倍率で再構築.
+        hpPhases.Clear();
+        hpPhases.Add(new WendigHpPhase
+        {
+            hp = 7500f * hpMultiplier,
+            displayRatio = 0.5f,
+            phaseName = "Normal"
+        });
+        hpPhases.Add(new WendigHpPhase
+        {
+            hp = 12500f * hpMultiplier,
+            displayRatio = 0.5f,
+            phaseName = "Berserk"
+        });
+
+        totalHp = 0f;
+        foreach (var phase in hpPhases) totalHp += phase.hp;
+        currentPhaseIndex = 0;
+
+        // Updater再生成（怒り閾値がHP依存のため）.
+        SetUpdater(new EnemAIUpdater_Wendig_Normal(this));
+
+        Debug.Log($"[WendigMasterAI] 難易度適用: {tags} → 倍率={hpMultiplier} NormalHP={hpPhases[0].hp} BerserkHP={hpPhases[1].hp} 合計={totalHp}");
+    }
+
     // === アクション設定初期化 ===
 
     /// <summary>アクション設定を初期化（Updaterから呼び出し可能）.</summary>

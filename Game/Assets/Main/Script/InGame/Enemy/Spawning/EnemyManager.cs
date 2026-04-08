@@ -26,6 +26,11 @@ namespace InGame.Enemy
         // 現在の敵インスタンス.
         public GameObject EnemyInstance => enemyInstance;
 
+        // 現在のミッションタグ（難易度・条件・Enemy名）.
+        private MissionTag currentMissionTags = MissionTag.None;
+        /// <summary>現在のミッションタグ（Enemy生成時にPlayerPrefsから読み取り）.</summary>
+        public MissionTag CurrentMissionTags => currentMissionTags;
+
         /// <summary>
         /// PlayerPrefsからEnemyNameを読み取って敵を生成.
         /// </summary>
@@ -34,9 +39,15 @@ namespace InGame.Enemy
             int enemyId = PlayerPrefs.GetInt("EnemyName", 0);
             EnemyName enemyName = (EnemyName)enemyId;
 
+            // MissionTags読み取り（EnemyNameと同じパターン）.
+            currentMissionTags = (MissionTag)PlayerPrefs.GetInt("MissionTags", 0);
+
             // 取得後に破棄.
             PlayerPrefs.DeleteKey("EnemyName");
+            PlayerPrefs.DeleteKey("MissionTags");
             PlayerPrefs.Save();
+
+            Debug.Log($"[EnemyManager] MissionTags読み取り: {currentMissionTags} ({(int)currentMissionTags})");
 
             if (enemyName == EnemyName.None)
             {

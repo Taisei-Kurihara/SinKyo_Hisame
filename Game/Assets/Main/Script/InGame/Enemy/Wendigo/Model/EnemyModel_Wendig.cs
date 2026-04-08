@@ -1,5 +1,6 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
+using InGame.Enemy;
 
 // EnemyModel_abstractを継承したWendig用モデル.
 public class EnemyModel_Wendig : EnemyModel_abstract
@@ -44,6 +45,10 @@ public class EnemyModel_Wendig : EnemyModel_abstract
 
     public override void EnemAIStart()
     {
+        // EnemyManagerからMissionTags（難易度等）を読み取りAIに設定.
+        var missionTags = EnemyManager.Instance(false).CurrentMissionTags;
+        AIModel.ApplyMissionTags(missionTags);
+
         AIModel.SetOwnerTransform(transform);
         AIModel.SetOwnerModel(this);
         AIModel.StartLoop();
