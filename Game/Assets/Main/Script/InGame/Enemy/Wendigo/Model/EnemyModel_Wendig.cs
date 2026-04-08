@@ -16,52 +16,37 @@ public class EnemyModel_Wendig : EnemyModel_abstract
         wendigStatus = GetComponent<EnemyStatus_Wendig>();
     }
 
-    private void Start()
-    {
-        // 怒り状態変更コールバック登録.
-        if (wendigStatus != null)
-        {
-            wendigStatus.SetOnAngerStateChanged(OnAngerStateChanged);
-            Debug.Log($"[EnemyModel_Wendig] Start - 怒り状態コールバック登録完了");
-        }
-        else
-        {
-            Debug.LogWarning($"[EnemyModel_Wendig] Start - wendigStatusがnull! 怒りコールバック登録失敗");
-        }
-    }
-
-    // 怒り状態変更時のコールバック.
-    private void OnAngerStateChanged(EnemyStatus_abstract.AngerState newState)
-    {
-        Debug.Log($"[EnemyModel_Wendig] 怒り状態変更 - {newState}");
-        if (newState == EnemyStatus_abstract.AngerState.Angry)
-        {
-            // 怒り開始 → AIModelにHowling実行を通知.
-            AIModel.NotifyAngerStateChanged(true);
-        }
-        else
-        {
-            // 怒り解除 → AIModelに通知.
-            AIModel.NotifyAngerStateChanged(false);
-        }
-    }
-
     // 現在の攻撃力を取得.
     public float GetCurrentAttackPower()
     {
         return wendigStatus != null ? wendigStatus.GetCurrentAttackPower() : 50f;
     }
 
+    // --- AI層への転送メソッド ---
 
+    /// <summary>ダメージ時の怒りゲージ増加をAIモデルに転送.</summary>
+    public void NotifyDamageForAnger(float amount)
+    {
+        AIModel.NotifyDamageForAnger(amount);
+    }
 
+    /// <summary>ダメージ時のフェーズ遷移チェックをAIモデルに転送.</summary>
+    public void CheckPhaseTransition(float remainingHp)
+    {
+        AIModel.CheckPhaseTransition(remainingHp);
+    }
+
+    /// <summary>フェーズ対応HPパーセントを取得.</summary>
+    public float GetPhaseAwareHpPercent(float remainingHp)
+    {
+        return AIModel.CalculateHpBarPercent(remainingHp);
+    }
 
     public override void EnemAIStart()
     {
-        //Debug.Log($"[EnemyModel_Wendig] EnemAIStart - {gameObject.name}");
         AIModel.SetOwnerTransform(transform);
         AIModel.SetOwnerModel(this);
         AIModel.StartLoop();
-        //Debug.Log($"[EnemyModel_Wendig] EnemAIStart完了");
     }
 
     // Wendig用AIModelを停止するためにオーバーライド.

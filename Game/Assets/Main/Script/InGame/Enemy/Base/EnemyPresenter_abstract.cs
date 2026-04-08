@@ -179,12 +179,18 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
             status.hp
                 .Subscribe(hp =>
                 {
-                    float percent = hp / status.maxhp;
+                    float percent = CalculateHpPercent(hp, status.maxhp);
                     view.SetHpGauge(percent);
                 })
                 .AddTo(this);
             Debug.Log($"[EnemyPresenter_abstract] HP購読設定完了");
         }
+    }
+
+    /// <summary>HP変化時のバーパーセント計算（子クラスでoverride可能）.</summary>
+    protected virtual float CalculateHpPercent(float currentHp, float maxHp)
+    {
+        return currentHp / maxHp;
     }
 
     // 派生クラスでmodel/statusのAddComponentを行う.
