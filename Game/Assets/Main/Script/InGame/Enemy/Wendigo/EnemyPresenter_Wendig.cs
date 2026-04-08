@@ -22,6 +22,16 @@ public class EnemyPresenter_Wendig : EnemyPresenter_abstract
         //Debug.Log($"[EnemyPresenter_Wendig] InitComponents完了");
     }
 
+    // フェーズ対応HPバーパーセント計算.
+    protected override float CalculateHpPercent(float currentHp, float maxHp)
+    {
+        if (WendigModel != null)
+        {
+            return WendigModel.GetPhaseAwareHpPercent(currentHp);
+        }
+        return base.CalculateHpPercent(currentHp, maxHp);
+    }
+
     // Wendigo用SE初期化.
     protected override async UniTask InitializeSE()
     {

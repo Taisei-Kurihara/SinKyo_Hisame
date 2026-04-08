@@ -23,30 +23,15 @@ public class EnemyStatus_Wendig : EnemyStatus_abstract
     public override void Init()
     {
         Debug.Log($"[EnemyStatus_Wendig] Init - {gameObject.name}");
-        // Wendig固有の初期化処理.
         wendigModel = GetComponent<EnemyModel_Wendig>();
-        // Wendig HPを20000に設定.
+        // Wendig HPを20000に設定（全フェーズ合計）.
         maxhp = 20000f;
         hp.Value = maxhp;
-
-        // Wendig用 怒りゲージパラメータ設定.
-        maxAngerGauge = 100f;
-        normalDecayRateMax = 5f;
-        normalDecayRateMin = 0.1f;
-        normalDecayRecoveryDuration = 10f;
-        normalClampDecayRate = 2f;
-        normalClampIncreaseRatio = 0.5f;
-        angryDecayRateMax = 8f;
-        angryDecayRateMin = 0.1f;
-        angryDecayRecoveryDuration = 10f;
-        angryClampDecayRate = 4f;
-
-        Debug.Log($"[EnemyStatus_Wendig] Init完了 - HP:{maxhp} MaxAnger:{maxAngerGauge} 変換率:damage/maxhp*maxAnger*5");
+        Debug.Log($"[EnemyStatus_Wendig] Init完了 - HP:{maxhp}");
     }
 
     private void Start()
     {
-        //Debug.Log($"[EnemyStatus_Wendig] Start - {gameObject.name}, HP: {hp.Value}, MaxHP: {maxhp}");
         // Initで取得できなかった場合の再取得.
         if (wendigModel == null)
         {
@@ -56,9 +41,12 @@ public class EnemyStatus_Wendig : EnemyStatus_abstract
 
     public override async UniTask OnDamaged(float damage, ChangeHP aschangeHP = null)
     {
-        //Debug.Log($"[EnemyStatus_Wendig] OnDamaged - {gameObject.name}, Damage: {damage}");
+        // フェーズ遷移チェック（HP bar subscription より先に）.
+        wendigModel?.CheckPhaseTransition(hp.Value - damage);
+        // HP減少処理.
         await base.OnDamaged(damage, aschangeHP);
-        //Debug.Log($"[EnemyStatus_Wendig] OnDamaged完了 - 残りHP: {hp.Value}");
+        // 怒りゲージ: HP減少×2をAI層に通知.
+        wendigModel?.NotifyDamageForAnger(damage * 2f);
     }
 
     protected override async UniTask Dead()
@@ -78,18 +66,8 @@ public class EnemyStatus_Wendig : EnemyStatus_abstract
         }
     }
 
-    // Wendig用 怒りゲージ増加量計算 (HP20000に対する適切な変換率).
-    // ダメージ → ゲージ増加: damage / maxhp * maxAngerGauge * 5 (5倍係数でHP20%分のダメージで怒り到達).
-    protected override float CalculateAngerIncrease(float damage)
-    {
-        float result = (damage / maxhp) * maxAngerGauge * 5f;
-        Debug.Log($"[EnemyStatus_Wendig] CalculateAngerIncrease - Damage:{damage:F1} → Increase:{result:F2} (damage/{maxhp}*{maxAngerGauge}*5)");
-        return result;
-    }
-
     protected override UniTask DeadAnim()
     {
-        //Debug.Log($"[EnemyStatus_Wendig] DeadAnim - {gameObject.name}");
         // DeadStateを使用するため、ここでは何もしない.
         return UniTask.CompletedTask;
     }

@@ -6,9 +6,6 @@ using InGame.Player;
 
 public abstract class EnemAIModel_abstract
 {
-
-    // stageの端について取得方法を考える必要あり.
-    // 自身の大きさを取得する方法 => 主コライダーの大きさで取るようにする.
     private CancellationTokenSource cts;
     private bool isRunning = false;
 
@@ -23,6 +20,26 @@ public abstract class EnemAIModel_abstract
 
     // ターゲットオブジェクト（プレイヤー）.
     protected GameObject targetObject;
+
+    // Updater（行動決定ロジック委譲先）.
+    private EnemAIUpdater_abstract updater;
+
+    // 次に切り替えるUpdater（pending状態）.
+    private EnemAIUpdater_abstract pendingUpdater;
+
+    // --- 公開プロパティ（Updaterからアクセス用） ---
+
+    /// <summary>現在のUpdater（子クラスからアクセス用）.</summary>
+    protected EnemAIUpdater_abstract CurrentUpdater => updater;
+
+    /// <summary>自身のEnemyModel.</summary>
+    public EnemyModel_abstract OwnerModel => ownerModel;
+
+    /// <summary>自身のTransform.</summary>
+    public Transform OwnerTransform => ownerTransform;
+
+    /// <summary>アクション設定リスト（読み取り専用）.</summary>
+    public IReadOnlyList<EnemAIActionSetting> ActionSettings => actionSettings;
 
     // ターゲット位置を取得するプロパティ.
     public Vector3 TargetPosition
@@ -71,6 +88,12 @@ public abstract class EnemAIModel_abstract
     {
         Debug.Log($"[EnemAIModel_abstract] SetOwnerModel - Model: {(model != null ? model.gameObject.name : "null")}");
         ownerModel = model;
+    }
+
+    /// <summary>Updaterを設定.</summary>
+    public void SetUpdater(EnemAIUpdater_abstract newUpdater)
+    {
+        updater = newUpdater;
     }
 
     // ループを開始.
@@ -124,6 +147,27 @@ public abstract class EnemAIModel_abstract
         }
 
         Debug.Log($"[EnemAIModel_abstract] AILoop - 初期化完了、ループ開始");
+
+        // Updaterが設定されている場合はUpdaterに委譲（切り替えループ対応）.
+        while (updater != null && !token.IsCancellationRequested)
+        {
+            await updater.RunUpdate(token);
+
+            // Updater終了後: pending updaterがあれば切り替え.
+            if (pendingUpdater != null && !token.IsCancellationRequested)
+            {
+                var prevName = updater.GetType().Name;
+                updater = pendingUpdater;
+                pendingUpdater = null;
+                Debug.Log($"[EnemAIModel_abstract] Updater切り替え完了: {prevName} → {updater.GetType().Name}");
+                continue; // 新Updaterでループ再開.
+            }
+            return; // pending無しなら通常終了.
+        }
+
+        if (updater != null) return; // Updaterがあったがキャンセルされた場合.
+
+        // Updater未設定: レガシーモード（OnAIUpdateを直接ループ）.
         int loopCount = 0;
         while (!token.IsCancellationRequested)
         {
@@ -161,21 +205,38 @@ public abstract class EnemAIModel_abstract
         Debug.Log($"[EnemAIModel_abstract] AILoop終了 - キャンセル要求 (loopCount: {loopCount})");
     }
 
-    // 継承クラスでAI処理を実装.
+    // 継承クラスでAI処理を実装（レガシーモード用）.
     protected virtual async UniTask OnAIUpdate(CancellationToken token)
     {
         await UniTask.CompletedTask;
     }
 
+    /// <summary>
+    /// 現在のUpdaterを停止して新しいUpdaterに切り替える.
+    /// 現Updaterが停止完了後に自動的に切り替わる.
+    /// </summary>
+    public void SwitchUpdater(EnemAIUpdater_abstract newUpdater)
+    {
+        if (updater == null)
+        {
+            SetUpdater(newUpdater);
+            return;
+        }
+
+        pendingUpdater = newUpdater;
+        updater.ForceStop(); // 現Updaterに強制停止を要求.
+        Debug.Log($"[EnemAIModel_abstract] Updater切り替え要求: {updater.GetType().Name} → {newUpdater.GetType().Name}");
+    }
+
     // アクション設定を追加.
-    protected void AddActionSetting(EnemAIActionSetting setting)
+    public void AddActionSetting(EnemAIActionSetting setting)
     {
         setting.Initialize();
         actionSettings.Add(setting);
     }
 
     // 距離に基づいてアクションを選択（重みづけ）.
-    protected EnemAIActionSetting SelectActionByDistance(float distance)
+    public EnemAIActionSetting SelectActionByDistance(float distance)
     {
         // 発動距離内のアクションをフィルタリング.
         var activatableActions = new List<EnemAIActionSetting>();
@@ -209,7 +270,7 @@ public abstract class EnemAIModel_abstract
     }
 
     // 移動開始距離内のアクションを選択.
-    protected EnemAIActionSetting SelectMoveActionByDistance(float distance)
+    public EnemAIActionSetting SelectMoveActionByDistance(float distance)
     {
         // 移動開始距離内のアクションをフィルタリング.
         var moveActions = new List<EnemAIActionSetting>();
