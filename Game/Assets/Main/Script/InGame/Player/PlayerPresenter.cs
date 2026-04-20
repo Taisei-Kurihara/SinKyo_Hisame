@@ -386,10 +386,10 @@ namespace InGame.Player
             {
                 state = guard.CurrentGuardState;
 
-                // パリィ成功時: 吸収ゲージポイント5付与.
+                // パリィ成功時: 吸収ゲージポイント25付与.
                 if (state == GuardState.Parry)
                 {
-                    drainModel?.Increment(5);
+                    drainModel?.Increment(25);
                 }
 
                 // Powerlevelで上回られた場合は強制防御解除.
@@ -422,8 +422,8 @@ namespace InGame.Player
             // ダメージ適用.
             playerStatusModel.Damage(damage);
 
-            // 鼓動上昇: 被弾時受けた減少HP×0.85倍.
-            pulseModel.OnDamageTaken(damage);
+            // 鼓動上昇: 現在の鼓動値×0.35.
+            pulseModel.OnDamageTaken();
 
             // 吹き飛ばし処理（Powerlevelで上回った場合のみ）.
             if (canKnockback)
