@@ -80,12 +80,11 @@ namespace InGame.Player
         }
 
         /// <summary>
-        /// 敵からの攻撃を受ける: 被弾時受けた減少HP×0.85倍.
+        /// 敵からの攻撃を受ける: 現在の鼓動値×0.35.
         /// </summary>
-        /// <param name="damageTaken">受けたダメージ量.</param>
-        public void OnDamageTaken(float damageTaken)
+        public void OnDamageTaken()
         {
-            float increase = damageTaken * 0.85f;
+            float increase = pulseGauge.Value * 0.35f;
             pulseGauge.Value = Math.Clamp(pulseGauge.Value + increase, minPulseGauge, maxPulseGauge);
             OnPulseIncreased();
         }

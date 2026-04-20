@@ -532,7 +532,7 @@ namespace InGame.Player
         private int currentComboNumber = 0;
 
         // コンボ番号ごとの吸収ゲージポイント.
-        private static readonly int[] drainGaugePoints = { 1, 1, 3 };
+        private static readonly int[] drainGaugePoints = { 5, 10, 15 };
 
         /// <summary>
         /// コンボ番号を設定.
@@ -749,11 +749,11 @@ namespace InGame.Player
                 if (!drainApplied)
                 {
                     drainApplied = true;
-                    // 居合ヒット時: 吸収ゲージポイント2付与.
+                    // 居合ヒット時: 吸収ゲージポイント10付与.
                     var drainModel = PlayerManager.Instance().drainModel;
                     if (drainModel != null)
                     {
-                        drainModel.Increment(2);
+                        drainModel.Increment(10);
                     }
                 }
             });
