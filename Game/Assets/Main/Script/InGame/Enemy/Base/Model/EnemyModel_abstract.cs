@@ -41,8 +41,8 @@ public abstract class EnemyModel_abstract : MonoBehaviour
     // アニメーション速度を取得.
     public float AnimSpeed => animator != null ? animator.speed : 1f;
 
-    // Platform検出.
-    protected PlatformDetector platformDetector = new PlatformDetector(0.5f, 0.1f);
+    // Platform検出（Awakeで初期化 — Unity APIはフィールド初期化子から呼べないため）.
+    protected PlatformDetector platformDetector;
 
     /// <summary>
     /// Platform検出器を取得.
@@ -65,6 +65,7 @@ public abstract class EnemyModel_abstract : MonoBehaviour
         Debug.Log($"[EnemyModel_abstract] Awake - {gameObject.name}");
         animator = GetComponent<Animator>();
         rigidbody = GetComponent<Rigidbody2D>();
+        platformDetector = new PlatformDetector(0.5f, 0.1f);
         Debug.Log($"[EnemyModel_abstract] Awake完了 - Animator: {(animator != null ? "取得" : "null")}, Rigidbody: {(rigidbody != null ? "取得" : "null")}");
     }
 
