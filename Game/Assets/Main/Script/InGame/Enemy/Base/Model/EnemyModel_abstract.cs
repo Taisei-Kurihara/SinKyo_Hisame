@@ -1,5 +1,6 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
+using InGame.Common;
 
 public abstract class EnemyModel_abstract : MonoBehaviour
 {
@@ -40,12 +41,92 @@ public abstract class EnemyModel_abstract : MonoBehaviour
     // アニメーション速度を取得.
     public float AnimSpeed => animator != null ? animator.speed : 1f;
 
+    // Platform検出（Awakeで初期化 — Unity APIはフィールド初期化子から呼べないため）.
+    protected PlatformDetector platformDetector;
+
+    /// <summary>
+    /// Platform検出器を取得.
+    /// </summary>
+    public PlatformDetector PlatformDetector => platformDetector;
+
+    /// <summary>
+    /// 足元にPlatformがあるか.
+    /// </summary>
+    public bool IsOnPlatform => platformDetector.IsOnPlatform;
+
+    /// <summary>
+    /// ジャンプ中フラグ. trueの間はFixedUpdateのPlatform落下制御をスキップする.
+    /// とびかかり切りなどisTrigger状態でジャンプする攻撃で使用.
+    /// </summary>
+    public bool IsJumping { get; set; } = false;
+
     protected virtual void Awake()
     {
         Debug.Log($"[EnemyModel_abstract] Awake - {gameObject.name}");
         animator = GetComponent<Animator>();
         rigidbody = GetComponent<Rigidbody2D>();
+        platformDetector = new PlatformDetector(0.5f, 0.1f);
         Debug.Log($"[EnemyModel_abstract] Awake完了 - Animator: {(animator != null ? "取得" : "null")}, Rigidbody: {(rigidbody != null ? "取得" : "null")}");
+    }
+
+    // キャッシュ用Collider参照.
+    private Collider2D cachedCollider;
+
+    /// <summary>
+    /// Colliderをキャッシュ付きで取得.
+    /// </summary>
+    protected Collider2D GetCachedCollider()
+    {
+        if (cachedCollider == null)
+        {
+            cachedCollider = GetComponent<Collider2D>();
+        }
+        return cachedCollider;
+    }
+
+    /// <summary>
+    /// FixedUpdate: 足元のPlatformレイキャスト検出と落下制御.
+    /// </summary>
+    protected virtual void FixedUpdate()
+    {
+        if (rigidbody == null) return;
+
+        Collider2D col = GetCachedCollider();
+        Vector2 feetPos;
+        float centerY;
+
+        if (col != null)
+        {
+            feetPos = new Vector2(col.bounds.center.x, col.bounds.min.y);
+            centerY = col.bounds.center.y;
+        }
+        else
+        {
+            feetPos = (Vector2)transform.position;
+            centerY = transform.position.y;
+        }
+
+        // ジャンプ中はPlatform検出・落下制御をスキップ.
+        if (IsJumping) return;
+
+        // 足元のPlatformをレイキャストで検出（中心位置で上下判定）.
+        platformDetector.CheckPlatformBelow(feetPos, centerY, rigidbody.linearVelocity.y);
+
+        // Platform上にいて下方向に落下中の場合、落下を無効化.
+        if (platformDetector.IsOnPlatform && rigidbody.linearVelocity.y <= 0f)
+        {
+            rigidbody.linearVelocity = new Vector2(rigidbody.linearVelocity.x, 0f);
+
+            // Platformの表面に位置をクランプ（上り坂・下り坂の両方に追従）.
+            if (col != null)
+            {
+                float clampDiff = platformDetector.ClampToPlatformSurface(col.bounds.min.y);
+                if (Mathf.Abs(clampDiff) > 0.001f)
+                {
+                    transform.position += new Vector3(0f, clampDiff, 0f);
+                }
+            }
+        }
     }
 
     protected EnemAIModel_abstract AIModel = new EnemAIModel_normal();

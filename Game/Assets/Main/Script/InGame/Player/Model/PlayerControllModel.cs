@@ -10,6 +10,7 @@ using VContainer;
 using static UnityEngine.RuleTile.TilingRuleOutput;
 
 
+
 namespace InGame.Player
 {
     public enum PlayerState
@@ -309,6 +310,16 @@ namespace InGame.Player
         private int jumpCount = 0;
 
         // -------------------------
+        // Platform検出
+        // -------------------------
+        private PlatformDetector platformDetector = new PlatformDetector(0.5f, 0.1f);
+
+        /// <summary>
+        /// Platform検出器を取得.
+        /// </summary>
+        public PlatformDetector PlatformDetector => platformDetector;
+
+        // -------------------------
         // 回避回数制限
         // -------------------------
         private int dodgeCount = 0;
@@ -364,11 +375,66 @@ namespace InGame.Player
         {
             playerAttach = attach;
         }
+        // キャッシュ用Collider参照.
+        private Collider2D cachedCollider;
+
+        /// <summary>
+        /// キャラクターのColliderを取得（キャッシュ付き）.
+        /// </summary>
+        private Collider2D GetCollider()
+        {
+            if (cachedCollider == null && avator != null)
+            {
+                cachedCollider = avator.GetComponent<Collider2D>();
+            }
+            return cachedCollider;
+        }
+
         // =====================================================
         // 重力
         // =====================================================
         public void OnGravity()
         {
+            // 足元のPlatformレイヤーをレイキャストで検出.
+            if (avator != null)
+            {
+                Collider2D col = GetCollider();
+                Vector2 feetPos;
+                float centerY;
+
+                if (col != null)
+                {
+                    feetPos = new Vector2(col.bounds.center.x, col.bounds.min.y);
+                    centerY = col.bounds.center.y;
+                }
+                else
+                {
+                    feetPos = (Vector2)avator.transform.position;
+                    centerY = avator.transform.position.y;
+                }
+                platformDetector.CheckPlatformBelow(feetPos, centerY, rigidbody.linearVelocity.y);
+            }
+
+            // Platform上にいて下方向に落下中または静止中の場合、落下を無効化.
+            if (platformDetector.IsOnPlatform && rigidbody.linearVelocity.y <= 0f)
+            {
+                rigidbody.linearVelocity = new Vector2(rigidbody.linearVelocity.x, 0f);
+
+                // Platformの表面に位置をクランプ（上り坂・下り坂の両方に追従）.
+                Collider2D col = GetCollider();
+                if (col != null)
+                {
+                    float clampDiff = platformDetector.ClampToPlatformSurface(col.bounds.min.y);
+                    if (Mathf.Abs(clampDiff) > 0.001f)
+                    {
+                        avator.transform.position += new Vector3(0f, clampDiff, 0f);
+                    }
+                }
+
+                // 重力を適用しない.
+                return;
+            }
+
             rigidbody.AddForce(Vector3.up * gravityPower, ForceMode2D.Force);
         }
 
@@ -389,7 +455,8 @@ namespace InGame.Player
             if (playerAttach != null)
             {
                 bool wasOnGround = isGround.Value;
-                isGround.Value = playerAttach.GetGroundSensor();
+                // 通常の地面センサーまたはPlatformレイキャストで接地判定.
+                isGround.Value = playerAttach.GetGroundSensor() || platformDetector.IsOnPlatform;
 
                 // 着地した瞬間にジャンプカウント・回避カウントをリセット.
                 if (!wasOnGround && isGround.Value)
@@ -406,20 +473,57 @@ namespace InGame.Player
         // =====================================================
         public void OnJumpEvent()
         {
-            //Debug.Log($"[Jump] OnJumpEvent called. jumpCount={jumpCount}, isGround={isGround.Value}");
+            // 処理前に着地状態を再確認（回避後に地面から離れていない場合のリセット漏れ防止）.
+            RefreshGroundState();
+
             if (jumpCount < 2)
             {
                 jumpCount++;
 
                 move = Vector3.zero;
-                move += Vector3.up * 12.0f;
+                move += Vector3.up * 15.0f;
 
                 rigidbody.linearVelocity = move;
             }
-            else
+        }
+
+        /// <summary>
+        /// 接地状態を再確認し、接地中ならジャンプ・回避カウントをリセットする.
+        /// ジャンプ/回避の処理前に呼ぶことで、地面から離れなかった場合のリセット漏れを防止.
+        /// </summary>
+        private void RefreshGroundState()
+        {
+            if (playerAttach != null)
             {
-                //Debug.Log("[Jump] Jump blocked - jumpCount >= 2");
+                bool currentlyGrounded = playerAttach.GetGroundSensor() || platformDetector.IsOnPlatform;
+                if (currentlyGrounded)
+                {
+                    isGround.Value = true;
+                    jumpCount = 0;
+                    dodgeCount = 0;
+                }
             }
+        }
+
+        // =====================================================
+        // Platformすり抜け
+        // =====================================================
+        /// <summary>
+        /// 現在乗っているPlatformをすり抜けて下に落ちる.
+        /// 下方向入力（0.5以上）で発動する.
+        /// </summary>
+        public void OnDropThroughPlatform()
+        {
+            if (!platformDetector.IsOnPlatform) return;
+
+            // キャラクターのCollider2Dを取得.
+            Collider2D characterCollider = avator.GetComponent<Collider2D>();
+            if (characterCollider == null) return;
+
+            platformDetector.StartDropThrough(characterCollider, 0.35f);
+
+            // 下方向に少し速度を与えてすり抜け開始.
+            rigidbody.linearVelocity = new Vector2(rigidbody.linearVelocity.x, -2f);
         }
 
         // =====================================================
@@ -427,6 +531,9 @@ namespace InGame.Player
         // =====================================================
         public void OnDodge(Vector2 vec)
         {
+            // 処理前に着地状態を再確認（回避後に地面から離れていない場合のリセット漏れ防止）.
+            RefreshGroundState();
+
             // 回避回数制限: 上限2回.
             if (dodgeCount >= maxDodgeCount) return;
             dodgeCount++;
@@ -541,10 +648,10 @@ namespace InGame.Player
             while (true)
             {
                 if (rigidbody == null || avator == null) return;
-                // 接地判定を更新.
+                // 接地判定を更新（通常地面 + Platform）.
                 if (playerAttach != null)
                 {
-                    isGround.Value = playerAttach.GetGroundSensor();
+                    isGround.Value = playerAttach.GetGroundSensor() || platformDetector.IsOnPlatform;
                     if (isGround.Value)
                     {
                         break;
