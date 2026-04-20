@@ -181,9 +181,10 @@ namespace InGame.Player
                     return;
                 }
 
+                // 非アクティブ状態で生成（Awakeの即時発火を防止）.
+                prefab.SetActive(false);
                 gameOverViewObj = Object.Instantiate(prefab);
-                // 初期状態は非表示（全Awake完了後に無効化）.
-                gameOverViewObj.SetActive(false);
+                prefab.SetActive(true); // プレハブ元の状態を復元.
             }
             catch (System.Exception e)
             {

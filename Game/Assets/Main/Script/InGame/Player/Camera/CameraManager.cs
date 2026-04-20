@@ -19,7 +19,7 @@ namespace Common
 
         // カメラ追従設定
         [SerializeField]
-        private Vector3 offset = new Vector3(0, 1.5f, -10f);
+        private Vector3 offset = new Vector3(0, 1f, -15f);
         [SerializeField]
         private float followSpeed = 5f;
 
