@@ -29,7 +29,7 @@ namespace InGame.Player
     public class DrainModel
     {
         public ReactiveProperty<int> num {  get; private set; }=new ReactiveProperty<int>();
-        public int oneGageMaxNum { get; private set; } = 20;
+        public int oneGageMaxNum { get; private set; } = 50;
         public int maxGages { get; private set; } = 10;
 
         // 条件付きイベントリスト（条件を満たしたら実行するコールバック）.
@@ -179,9 +179,8 @@ namespace InGame.Player
         public void SetHp(int value) => hp.Value = value;
         public void IncrementHp(int _value)
         {
-            hp.Value += _value;
-            // maxHpを超過しない.
-            if (hp.Value > maxHp) hp.Value = maxHp;
+            // 先にクランプしてから1回だけ代入（ReactivePropertyの二重発火を防止）.
+            hp.Value = Mathf.Min(hp.Value + _value, maxHp);
         }
         public void Damage(int value)
         {
@@ -339,6 +338,11 @@ namespace InGame.Player
         public bool IsDodgeInvincible => isDodgeInvincible;
 
         // -------------------------
+        // 残像エフェクト
+        // -------------------------
+        private AfterimageEffect afterimageEffect;
+
+        // -------------------------
         // ダッシュ関連
         // -------------------------
         private CoolTimeBuilder dodgeCool = new CoolTimeBuilder();
@@ -356,6 +360,16 @@ namespace InGame.Player
         public void Initialize()
         {
             status.InitializeStatus();
+
+            // 残像エフェクト初期化.
+            if (avator != null && afterimageEffect == null)
+            {
+                afterimageEffect = avator.GetComponent<AfterimageEffect>();
+                if (afterimageEffect == null)
+                {
+                    afterimageEffect = avator.AddComponent<AfterimageEffect>();
+                }
+            }
         }
 
         /// <summary>
@@ -413,6 +427,18 @@ namespace InGame.Player
                     centerY = avator.transform.position.y;
                 }
                 platformDetector.CheckPlatformBelow(feetPos, centerY, rigidbody.linearVelocity.y);
+            }
+
+            // 接地状態を常に更新（アクション中でも着地を検出するため）.
+            if (playerAttach != null)
+            {
+                bool wasOnGround = isGround.Value;
+                isGround.Value = playerAttach.GetGroundSensor() || platformDetector.IsOnPlatform;
+                if (!wasOnGround && isGround.Value)
+                {
+                    jumpCount = 0;
+                    dodgeCount = 0;
+                }
             }
 
             // Platform上にいて下方向に落下中または静止中の場合、落下を無効化.
@@ -563,6 +589,9 @@ namespace InGame.Player
                 dashDir = vec.normalized;
                 startPos = rigidbody.position;
                 prevOffset = Vector2.zero;
+
+                // 残像エフェクト開始.
+                afterimageEffect?.StartEffect();
             })
             .OnFixed(() =>
             {
@@ -579,6 +608,9 @@ namespace InGame.Player
             {
                 enableAction = false;
                 isDodgeInvincible = false;
+
+                // 残像エフェクト停止.
+                afterimageEffect?.StopEffect();
             })
             .Run();
         }

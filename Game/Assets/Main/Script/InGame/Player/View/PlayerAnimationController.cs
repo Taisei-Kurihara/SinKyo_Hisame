@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 namespace InGame.Player.Animation
@@ -14,6 +15,8 @@ namespace InGame.Player.Animation
         private static readonly int HurtHash = Animator.StringToHash("Hurt");//被ダメージ.
         private static readonly int DeadHash = Animator.StringToHash("Dead");//死亡.
         private static readonly int GuardHash = Animator.StringToHash("Guard");//ガード.
+        private static readonly int JumpHash = Animator.StringToHash("Jump");//ジャンプ.
+        private static readonly int JumpOnGroundHash = Animator.StringToHash("JumpOnGround");//着地.
 
         private Animator animator;
         private Rigidbody2D rb;
@@ -140,12 +143,62 @@ namespace InGame.Player.Animation
         }
 
         /// <summary>
+        /// ジャンプ
+        /// </summary>
+        public void PlayJump()
+        {
+            animator.SetTrigger(JumpHash);
+        }
+
+        /// <summary>
+        /// 着地
+        /// </summary>
+        public void PlayJumpOnGround()
+        {
+            animator.SetTrigger(JumpOnGroundHash);
+        }
+
+        /// <summary>
         /// 汎用トリガー実行.
         /// </summary>
         /// <param name="triggerName">トリガー名.</param>
         public void PlayTrigger(string triggerName)
         {
             animator.SetTrigger(triggerName);
+        }
+
+        // Animation Event コールバック.
+        private Action onHitDetectionStart;
+        private Action onHitDetectionEnd;
+
+        /// <summary>
+        /// Animation Event: 攻撃のhit判定開始タイミング.
+        /// アニメーションクリップのキーフレームから呼ばれる.
+        /// </summary>
+        public void AnimEvent_HitStart() => onHitDetectionStart?.Invoke();
+
+        /// <summary>
+        /// Animation Event: 攻撃のhit判定終了タイミング.
+        /// アニメーションクリップのキーフレームから呼ばれる.
+        /// </summary>
+        public void AnimEvent_HitEnd() => onHitDetectionEnd?.Invoke();
+
+        /// <summary>
+        /// hit判定コールバックを登録.
+        /// </summary>
+        public void RegisterHitDetectionCallbacks(Action onStart, Action onEnd)
+        {
+            onHitDetectionStart = onStart;
+            onHitDetectionEnd = onEnd;
+        }
+
+        /// <summary>
+        /// hit判定コールバックをクリア.
+        /// </summary>
+        public void ClearHitDetectionCallbacks()
+        {
+            onHitDetectionStart = null;
+            onHitDetectionEnd = null;
         }
 
         /// <summary>
@@ -177,7 +230,11 @@ namespace InGame.Player.Animation
         void PlayDodge();
         void PlayHurt();
         void PlayDead();
+        void PlayJump();
+        void PlayJumpOnGround();
         void PlayTrigger(string triggerName);
+        void RegisterHitDetectionCallbacks(Action onStart, Action onEnd);
+        void ClearHitDetectionCallbacks();
         void SetAnimatorSpeed(float speed);
         void ClearActionAnimatorSpeed();
     }
