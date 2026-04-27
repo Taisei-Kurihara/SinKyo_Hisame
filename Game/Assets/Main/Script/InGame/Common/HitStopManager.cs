@@ -25,18 +25,19 @@ namespace InGame.Common
         {
             float freeze;
             float recovery;
+            // 2フレーム分 @60fps (2/60 ≈ 0.0333秒).
             switch (attackType)
             {
                 case PlayerAttackType.Iai:
-                    freeze = 0.1f;
+                    freeze = 2f / 60f;
                     recovery = 0.075f;
                     break;
                 case PlayerAttackType.Normal:
-                    freeze = 0.075f;
+                    freeze = 2f / 60f;
                     recovery = 0.075f;
                     break;
                 default: // Weak など.
-                    freeze = 0.075f;
+                    freeze = 2f / 60f;
                     recovery = 0.075f;
                     break;
             }

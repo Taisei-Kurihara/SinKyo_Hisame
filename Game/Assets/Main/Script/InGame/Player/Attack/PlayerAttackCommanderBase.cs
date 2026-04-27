@@ -359,6 +359,272 @@ namespace InGame.Player
         }
 
         /// <summary>
+        /// Animation Event ベースの当たり判定有効化.
+        /// AnimEvent_HitStart で判定開始、AnimEvent_HitEnd で判定終了.
+        /// Animation Event が未設定の場合はフォールバックとして即時開始.
+        /// </summary>
+        /// <param name="parent">コライダーの親Transform.</param>
+        /// <param name="damage">ダメージ量.</param>
+        /// <param name="duration">判定の最大持続時間（AnimEvent_HitEnd のフォールバック）.</param>
+        /// <param name="offset">コライダーオフセット.</param>
+        /// <param name="size">コライダーサイズ.</param>
+        /// <param name="startTimeoutSec">AnimEvent_HitStart のタイムアウト秒（超えたら即時開始）.</param>
+        /// <param name="onHitCallback">ヒット時コールバック.</param>
+        /// <param name="attackType">攻撃タイプ.</param>
+        /// <returns>ヒット数.</returns>
+        protected async UniTask<int> ActivateHitDetectionOnAnimEvent(
+            Transform parent,
+            float damage,
+            float duration,
+            Vector2 offset,
+            Vector2 size,
+            float startTimeoutSec = 0.5f,
+            Action onHitCallback = null,
+            PlayerAttackType attackType = PlayerAttackType.None)
+        {
+            // AnimEvent_HitStart 待機用.
+            var hitStartTcs = new UniTaskCompletionSource();
+            var hitEndTcs = new UniTaskCompletionSource();
+
+            // コールバック登録.
+            playerAnimation?.RegisterHitDetectionCallbacks(
+                onStart: () => hitStartTcs.TrySetResult(),
+                onEnd: () => hitEndTcs.TrySetResult()
+            );
+
+            try
+            {
+                // AnimEvent_HitStart を待機（タイムアウト付き）.
+                // タイムアウト時（Animation Event 未設定）は即座にhit判定を開始.
+                var startResult = await UniTask.WhenAny(
+                    hitStartTcs.Task,
+                    UniTask.Delay(TimeSpan.FromSeconds(startTimeoutSec))
+                );
+
+                if (startResult == 0)
+                {
+                    Debug.Log("[AttackBase] AnimEvent_HitStart 検出 → hit判定開始");
+                }
+                else
+                {
+                    Debug.LogWarning("[AttackBase] AnimEvent_HitStart タイムアウト → フォールバック即時開始");
+                }
+
+                // ここから当たり判定開始.
+                var localColliderStatus = new PlayerColliderStatus
+                {
+                    parentTransform = parent,
+                    damage = damage,
+                    duration = duration
+                };
+                localColliderStatus.colliderSettings.Add(new PlayerColliderSetting(PlayerColliderType.Box, offset, size));
+
+                var localColliderState = new PlayerColliderState_EnemyDamage();
+                localColliderState.SetColliderStatus(localColliderStatus);
+                localColliderState.ClearHitTargets();
+                localColliderState.ResetHitCount();
+
+                if (attackType != PlayerAttackType.None)
+                {
+                    localColliderState.SetAttackType(attackType);
+                }
+
+                // ヒットコールバック設定.
+                bool hitCallbackFired = false;
+                if (onHitCallback != null)
+                {
+                    localColliderState.SetOnHitCallback(() =>
+                    {
+                        if (!hitCallbackFired)
+                        {
+                            hitCallbackFired = true;
+                            onHitCallback.Invoke();
+                        }
+                    });
+                }
+
+                // ヒット検出コンポーネント追加.
+                PlayerAttackHitDetector localHitDetector = parent.gameObject.AddComponent<PlayerAttackHitDetector>();
+                localHitDetector.Initialize(localColliderState, localColliderStatus.colliderSettings, parent);
+
+                try
+                {
+                    // AnimEvent_HitEnd またはタイムアウトを待機.
+                    await UniTask.WhenAny(
+                        hitEndTcs.Task,
+                        UniTask.Delay(TimeSpan.FromSeconds(duration))
+                    );
+                }
+                finally
+                {
+                    // ヒット検出コンポーネント削除.
+                    if (localHitDetector != null)
+                    {
+                        UnityEngine.Object.Destroy(localHitDetector);
+                    }
+                }
+
+                return localColliderState.GetHitCount();
+            }
+            finally
+            {
+                // コールバッククリア.
+                playerAnimation?.ClearHitDetectionCallbacks();
+            }
+        }
+
+        // ZanHitController キャッシュ.
+        private ZanHitController cachedZanController;
+
+        /// <summary>
+        /// ZanHitController を取得（キャッシュ付き）.
+        /// </summary>
+        private ZanHitController GetZanController()
+        {
+            if (cachedZanController != null) return cachedZanController;
+            if (playerModel == null) return null;
+            var avator = playerModel.GetAvator();
+            if (avator == null) return null;
+            cachedZanController = avator.GetComponentInChildren<ZanHitController>(true);
+            return cachedZanController;
+        }
+
+        /// <summary>
+        /// Zan スプライト形状ベースの当たり判定有効化.
+        /// PolygonCollider2D でスプライトの見た目通りのヒット検出を行う.
+        /// パルスゲージに連動してZanのスケールを更新する.
+        /// </summary>
+        protected async UniTask<int> ActivateZanHitDetection(
+            Transform parent,
+            float damage,
+            float duration,
+            float startTimeoutSec = 0.02f,
+            Action onHitCallback = null,
+            PlayerAttackType attackType = PlayerAttackType.None)
+        {
+            var zanController = GetZanController();
+            if (zanController == null)
+            {
+                Debug.LogWarning("[AttackBase] ZanHitController が見つかりません。フォールバック: Box判定");
+                // フォールバック: 従来のBox判定.
+                return await ActivateHitDetectionOnAnimEvent(
+                    parent, damage, duration,
+                    new Vector2(-1.75f, 0f), new Vector2(2.5f, 2f),
+                    startTimeoutSec, onHitCallback, attackType);
+            }
+
+            // パルスゲージと攻撃タイプに応じてZanスケール更新.
+            float pulse = PlayerManager.Instance().pulseModel.GetPulseGauge();
+            zanController.UpdateScale(pulse, attackType);
+
+            // AnimEvent 待機用.
+            var hitStartTcs = new UniTaskCompletionSource();
+            var hitEndTcs = new UniTaskCompletionSource();
+
+            playerAnimation?.RegisterHitDetectionCallbacks(
+                onStart: () => hitStartTcs.TrySetResult(),
+                onEnd: () => hitEndTcs.TrySetResult()
+            );
+
+            try
+            {
+                // AnimEvent_HitStart 待機.
+                var startResult = await UniTask.WhenAny(
+                    hitStartTcs.Task,
+                    UniTask.Delay(TimeSpan.FromSeconds(startTimeoutSec))
+                );
+
+                if (startResult == 0)
+                {
+                    Debug.Log("[AttackBase] Zan: AnimEvent_HitStart 検出");
+                }
+
+                // コライダーステート作成（ヒット処理用）.
+                var localColliderStatus = new PlayerColliderStatus
+                {
+                    parentTransform = parent,
+                    damage = damage,
+                    duration = duration
+                };
+
+                var localColliderState = new PlayerColliderState_EnemyDamage();
+                localColliderState.SetColliderStatus(localColliderStatus);
+                localColliderState.ClearHitTargets();
+                localColliderState.ResetHitCount();
+
+                if (attackType != PlayerAttackType.None)
+                {
+                    localColliderState.SetAttackType(attackType);
+                }
+
+                bool hitCallbackFired = false;
+                if (onHitCallback != null)
+                {
+                    localColliderState.SetOnHitCallback(() =>
+                    {
+                        if (!hitCallbackFired)
+                        {
+                            hitCallbackFired = true;
+                            onHitCallback.Invoke();
+                        }
+                    });
+                }
+
+                // Zan 表示 + コライダー有効化（攻撃タイプでカラー切替）.
+                bool isIai = (attackType == PlayerAttackType.Iai);
+                zanController.Show(isIai);
+
+                try
+                {
+                    // ヒット検出ループ（AnimEvent_HitEnd or タイムアウトまで）.
+                    bool ended = false;
+                    float elapsed = 0f;
+
+                    // hitEnd監視タスク.
+                    UniTask.WhenAny(
+                        hitEndTcs.Task,
+                        UniTask.Delay(TimeSpan.FromSeconds(duration))
+                    ).ContinueWith(_ => ended = true).Forget();
+
+                    while (!ended)
+                    {
+                        // OverlapCollider でEnemy検出.
+                        var hits = zanController.DetectEnemies();
+                        foreach (var hitCollider in hits)
+                        {
+                            if (hitCollider == null) continue;
+                            // EnemyPresenter を持つオブジェクトを探す.
+                            var enemyPresenter = hitCollider.GetComponent<EnemyPresenter_abstract>();
+                            if (enemyPresenter == null)
+                            {
+                                enemyPresenter = hitCollider.GetComponentInParent<EnemyPresenter_abstract>();
+                            }
+                            if (enemyPresenter != null)
+                            {
+                                localColliderState.TryProcessHit(enemyPresenter.gameObject, hitCollider);
+                            }
+                        }
+
+                        elapsed += Time.deltaTime;
+                        if (elapsed >= duration) break;
+                        await UniTask.Yield();
+                    }
+                }
+                finally
+                {
+                    // Zan 非表示 + コライダー無効化.
+                    zanController.Hide();
+                }
+
+                return localColliderState.GetHitCount();
+            }
+            finally
+            {
+                playerAnimation?.ClearHitDetectionCallbacks();
+            }
+        }
+
+        /// <summary>
         /// 当たり判定を有効化して一定時間後に無効化.
         /// </summary>
         protected async UniTask ActivateHitDetection(Transform parent, float damage, float duration, Vector2 offset, Vector2 size)
@@ -405,14 +671,9 @@ namespace InGame.Player
         // 強攻撃: 1.2倍.
         private float attackMultiplier = 1.2f;
         private float duration = 0.3f;
-        // コライダー位置を左右逆に（-1f）.
-        private Vector2 hitboxOffset = new Vector2(-1.75f, 0f);
-        private Vector2 hitboxSize = new Vector2(2.5f, 2f);
 
         public override void Act()
         {
-            //Debug.Log("[NormalAttackDefault] Act - 攻撃実行.");
-
             if (playerModel == null || playerModel.GetAvator() == null) return;
 
             GameObject avator = playerModel.GetAvator();
@@ -431,88 +692,43 @@ namespace InGame.Player
                 animator.SetTrigger("NormalAttackDefault");
             }
 
-            // 当たり判定有効化.
+            // Zan スプライト形状ベースの当たり判定有効化.
             ActivateHitDetectionAsync(avator.transform, damage).Forget();
         }
 
-        /// <summary>
-        /// 当たり判定を有効化して削除を確実に行う.
-        /// </summary>
         private async UniTask ActivateHitDetectionAsync(Transform parent, float damage)
         {
-            // コライダーステータス作成.
-            var localColliderStatus = new PlayerColliderStatus
-            {
-                parentTransform = parent,
-                damage = damage,
-                duration = duration
-            };
-            localColliderStatus.colliderSettings.Add(new PlayerColliderSetting(PlayerColliderType.Box, hitboxOffset, hitboxSize));
-
-            // コライダーステート作成.
-            var localColliderState = new PlayerColliderState_EnemyDamage();
-            localColliderState.SetColliderStatus(localColliderStatus);
-            localColliderState.ClearHitTargets();
-            localColliderState.ResetHitCount();
-
-            // SE再生済みフラグ.
             bool sePlayedHit = false;
-            bool sePlayedMiss = false;
 
-            // ヒット時SEコールバック設定（即座に再生）.
-            localColliderState.SetOnHitCallback(() =>
-            {
-                if (!sePlayedHit)
+            int hitCount = await ActivateZanHitDetection(
+                parent, damage, duration,
+                startTimeoutSec: 0.02f,
+                onHitCallback: () =>
                 {
-                    sePlayedHit = true;
-                    PlaySE("AttackHit");
-
-                    // 強攻撃ヒット時: 吸収ゲージポイント2付与.
-                    var drainModel = PlayerManager.Instance().drainModel;
-                    if (drainModel != null)
+                    if (!sePlayedHit)
                     {
-                        drainModel.Increment(2);
+                        sePlayedHit = true;
+                        PlaySE("AttackHit");
+
+                        // 強攻撃ヒット時: 吸収ゲージポイント2付与.
+                        var drainModel = PlayerManager.Instance().drainModel;
+                        drainModel?.Increment(2);
                     }
                 }
-            });
+            );
 
-            // ヒット検出コンポーネント追加（Physics2D.Overlap方式）.
-            PlayerAttackHitDetector localHitDetector = parent.gameObject.AddComponent<PlayerAttackHitDetector>();
-            localHitDetector.Initialize(localColliderState, localColliderStatus.colliderSettings, parent);
-
-            try
+            // ミス判定.
+            if (hitCount == 0)
             {
-                // 物理判定を待つ（FixedUpdate 1フレーム）.
-                await UniTask.WaitForFixedUpdate();
-
-                // 判定直後にhit/miss判定してSE再生.
-                if (localColliderState.GetHitCount() == 0 && !sePlayedMiss)
-                {
-                    sePlayedMiss = true;
-                    // 空振りSE再生.
-                    PlaySE("AttackMiss");
-                }
-
-                // 残りの持続時間待機.
-                float remainingTime = duration - Time.fixedDeltaTime;
-                if (remainingTime > 0)
-                {
-                    await UniTask.Delay(TimeSpan.FromSeconds(remainingTime));
-                }
+                PlaySE("AttackMiss");
+                PlayerManager.Instance().pulseModel.OnAttackMiss();
             }
-            finally
-            {
-                // 鼓動上昇: 攻撃を振る（Miss） +1 - ヒットが0の場合.
-                if (localColliderState.GetHitCount() == 0)
-                {
-                    PlayerManager.Instance().pulseModel.OnAttackMiss();
-                }
 
-                // ヒット検出コンポーネント削除.
-                if (localHitDetector != null)
-                {
-                    UnityEngine.Object.Destroy(localHitDetector);
-                }
+            // 攻撃終了トリガー.
+            Animator endAnimator = parent.GetComponent<Animator>();
+            if (endAnimator != null)
+            {
+                endAnimator.SetTrigger("NormalAttackDefaultEnd");
             }
         }
     }
@@ -525,14 +741,12 @@ namespace InGame.Player
         // コンボ番号ごとの技倍率（弱攻撃_1:0.25, 弱攻撃_2:0.45, 弱攻撃_3:1.05）.
         private static readonly float[] attackMultipliers = { 0.25f, 0.45f, 1.05f };
         private float duration = 0.3f;
-        private Vector2 hitboxOffset = new Vector2(-1.75f, 0f);
-        private Vector2 hitboxSize = new Vector2(2.5f, 2f);
 
         // 現在のコンボ番号（0:弱攻撃_1, 1:弱攻撃_2, 2:弱攻撃_3）.
         private int currentComboNumber = 0;
 
         // コンボ番号ごとの吸収ゲージポイント.
-        private static readonly int[] drainGaugePoints = { 1, 1, 3 };
+        private static readonly int[] drainGaugePoints = { 5, 10, 15 };
 
         /// <summary>
         /// コンボ番号を設定.
@@ -566,94 +780,42 @@ namespace InGame.Player
 
             // アニメーションはPresenter側で制御するため、ここでは設定しない.
 
-            // 当たり判定有効化.
+            // Zan スプライト形状ベースの当たり判定有効化.
             ActivateHitDetectionAsync(avator.transform, damage).Forget();
         }
 
-        /// <summary>
-        /// 当たり判定を有効化して削除を確実に行う.
-        /// </summary>
         private async UniTask ActivateHitDetectionAsync(Transform parent, float damage)
         {
-            // コライダーステータス作成.
-            var localColliderStatus = new PlayerColliderStatus
-            {
-                parentTransform = parent,
-                damage = damage,
-                duration = duration
-            };
-            localColliderStatus.colliderSettings.Add(new PlayerColliderSetting(PlayerColliderType.Box, hitboxOffset, hitboxSize));
-
-            // コライダーステート作成.
-            var localColliderState = new PlayerColliderState_EnemyDamage();
-            localColliderState.SetColliderStatus(localColliderStatus);
-            localColliderState.ClearHitTargets();
-            localColliderState.ResetHitCount();
-            localColliderState.SetAttackType(PlayerAttackType.Weak);
-
-            // SE再生済みフラグ.
             bool sePlayedHit = false;
-            bool sePlayedMiss = false;
 
             // ヒット時に付与するゲージポイントを取得.
             int gaugePoints = (currentComboNumber >= 0 && currentComboNumber < drainGaugePoints.Length)
                 ? drainGaugePoints[currentComboNumber]
                 : 1;
 
-            // ヒット時SEコールバック設定（即座に再生）.
-            localColliderState.SetOnHitCallback(() =>
-            {
-                if (!sePlayedHit)
+            int hitCount = await ActivateZanHitDetection(
+                parent, damage, duration,
+                startTimeoutSec: 0.02f,
+                onHitCallback: () =>
                 {
-                    sePlayedHit = true;
-                    PlaySE("AttackHit");
-
-                    // 吸収ゲージポイント付与.
-                    var drainModel = PlayerManager.Instance().drainModel;
-                    if (drainModel != null)
+                    if (!sePlayedHit)
                     {
-                        drainModel.Increment(gaugePoints);
+                        sePlayedHit = true;
+                        PlaySE("AttackHit");
+
+                        // 吸収ゲージポイント付与.
+                        var drainModel = PlayerManager.Instance().drainModel;
+                        drainModel?.Increment(gaugePoints);
                     }
-                }
-            });
+                },
+                attackType: PlayerAttackType.Weak
+            );
 
-            // ヒット検出コンポーネント追加（Physics2D.Overlap方式）.
-            PlayerAttackHitDetector localHitDetector = parent.gameObject.AddComponent<PlayerAttackHitDetector>();
-            localHitDetector.Initialize(localColliderState, localColliderStatus.colliderSettings, parent);
-
-            try
+            // ミス判定.
+            if (hitCount == 0)
             {
-                // 物理判定を待つ（FixedUpdate 1フレーム）.
-                await UniTask.WaitForFixedUpdate();
-
-                // 判定直後にhit/miss判定してSE再生.
-                if (localColliderState.GetHitCount() == 0 && !sePlayedMiss)
-                {
-                    sePlayedMiss = true;
-                    // 空振りSE再生.
-                    PlaySE("AttackMiss");
-                }
-
-                // 残りの持続時間待機.
-                float remainingTime = duration - Time.fixedDeltaTime;
-                if (remainingTime > 0)
-                {
-                    await UniTask.Delay(TimeSpan.FromSeconds(remainingTime));
-                }
-            }
-            finally
-            {
-                // 鼓動上昇: 攻撃を振る（Miss） +1 - ヒットが0の場合.
-                if (localColliderState.GetHitCount() == 0)
-                {
-                    PlayerManager.Instance().pulseModel.OnAttackMiss();
-                }
-
-                // ヒット検出コンポーネント削除.
-                if (localHitDetector != null)
-                {
-                    UnityEngine.Object.Destroy(localHitDetector);
-                }
+                PlaySE("AttackMiss");
+                PlayerManager.Instance().pulseModel.OnAttackMiss();
             }
         }
     }
@@ -667,8 +829,6 @@ namespace InGame.Player
         // 攻撃パラメータ.
         // 居合: 鼓動ゲージベースで倍率計算 (最大2.5倍、基礎攻撃力に上乗せ).
         private float duration = 0.4f;
-        private Vector2 hitboxOffset = new Vector2(-1.75f, 0f);
-        private Vector2 hitboxSize = new Vector2(2.5f, 2f);
 
         /// <summary>
         /// 居合ダメージ計算: 基礎攻撃力 × (1 + 鼓動ボーナス).
@@ -715,67 +875,30 @@ namespace InGame.Player
             // 居合SE再生.
             PlaySE("IaiAttack");
 
-            // 当たり判定有効化.
+            // Zan スプライト形状ベースの当たり判定有効化.
             ActivateHitDetectionAsync(avator.transform, damage).Forget();
         }
 
-        /// <summary>
-        /// 当たり判定を有効化して削除を確実に行う.
-        /// </summary>
         private async UniTask ActivateHitDetectionAsync(Transform parent, float damage)
         {
-            // コライダーステータス作成.
-            var localColliderStatus = new PlayerColliderStatus
-            {
-                parentTransform = parent,
-                damage = damage,
-                duration = duration
-            };
-            localColliderStatus.colliderSettings.Add(new PlayerColliderSetting(PlayerColliderType.Box, hitboxOffset, hitboxSize));
-
-            // コライダーステート作成.
-            var localColliderState = new PlayerColliderState_EnemyDamage();
-            localColliderState.SetColliderStatus(localColliderStatus);
-            localColliderState.ClearHitTargets();
-            localColliderState.ResetHitCount();
-            localColliderState.SetAttackType(PlayerAttackType.Iai);
-
-            // ヒット時ゲージポイント付与フラグ.
-            bool drainApplied = false;
-
-            // ヒット時コールバック設定（吸収ゲージポイント付与）.
-            localColliderState.SetOnHitCallback(() =>
-            {
-                if (!drainApplied)
+            await ActivateZanHitDetection(
+                parent, damage, duration,
+                startTimeoutSec: 0.02f,
+                onHitCallback: () =>
                 {
-                    drainApplied = true;
-                    // 居合ヒット時: 吸収ゲージポイント2付与.
+                    // 居合ヒット時: 吸収ゲージポイント10付与.
                     var drainModel = PlayerManager.Instance().drainModel;
-                    if (drainModel != null)
-                    {
-                        drainModel.Increment(2);
-                    }
-                }
-            });
+                    drainModel?.Increment(10);
+                },
+                attackType: PlayerAttackType.Iai
+            );
+            // 居合はヒット/ミス判定なし（パリィ・HeartResist成功報酬のため）.
 
-            // ヒット検出コンポーネント追加（Physics2D.Overlap方式）.
-            PlayerAttackHitDetector localHitDetector = parent.gameObject.AddComponent<PlayerAttackHitDetector>();
-            localHitDetector.Initialize(localColliderState, localColliderStatus.colliderSettings, parent);
-
-            try
+            // 居合攻撃終了トリガー.
+            Animator endAnimator = parent.GetComponent<Animator>();
+            if (endAnimator != null)
             {
-                // 持続時間待機.
-                await UniTask.Delay(TimeSpan.FromSeconds(duration));
-            }
-            finally
-            {
-                // 居合はヒット/ミス判定なし（パリィ・HeartResist成功報酬のため）.
-
-                // ヒット検出コンポーネント削除.
-                if (localHitDetector != null)
-                {
-                    UnityEngine.Object.Destroy(localHitDetector);
-                }
+                endAnimator.SetTrigger("IaiEnd");
             }
         }
     }

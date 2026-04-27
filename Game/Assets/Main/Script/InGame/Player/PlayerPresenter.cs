@@ -67,6 +67,7 @@ namespace InGame.Player
 
         // 鼓動200スタン用変数.
         private bool isPulseMaxStunning = false;
+        private bool stunInterruptedByDamage = false;
 
         // ガード/パリィSE用.
         private SEPlayer guardSEPlayer;
@@ -166,6 +167,33 @@ namespace InGame.Player
             //InputSystem起動
             inputActions?.CharacterController.Enable();
             inputActions?.Player.Enable();
+
+            // 着地検出: isGround が false→true になった時に JumpOnGround + Idol トリガー.
+            {
+                bool prevGround = playerModel.isGround.Value;
+                bool isFirstEmission = true;
+                compositeDisposePlayer.Add(
+                    playerModel.isGround
+                    .Subscribe(current =>
+                    {
+                        // 初回（ReactivePropertyの初期値）はスキップ.
+                        if (isFirstEmission)
+                        {
+                            isFirstEmission = false;
+                            prevGround = current;
+                            return;
+                        }
+
+                        // false → true 遷移 = 着地.
+                        if (!prevGround && current)
+                        {
+                            Debug.Log("[PlayerPresenter] 着地検出 - JumpOnGround / Idol トリガー発火");
+                            playerAnimation?.PlayJumpOnGround();
+                            playerAnimation?.PlayTrigger("Idol");
+                        }
+                        prevGround = current;
+                    }));
+            }
 
             // HP <= 0 で死亡処理.
             compositeDisposePlayer.Add(
@@ -284,6 +312,7 @@ namespace InGame.Player
                 {
                     EndJakComboIfActive();
                     playerModel.OnJumpEvent();
+                    playerAnimation?.PlayJump();
                 }
 
                 //if (inputActions.CharacterController.Search.WasPressedThisFrame())
@@ -386,10 +415,10 @@ namespace InGame.Player
             {
                 state = guard.CurrentGuardState;
 
-                // パリィ成功時: 吸収ゲージポイント5付与.
+                // パリィ成功時: 吸収ゲージポイント25付与.
                 if (state == GuardState.Parry)
                 {
-                    drainModel?.Increment(5);
+                    drainModel?.Increment(25);
                 }
 
                 // Powerlevelで上回られた場合は強制防御解除.
@@ -422,8 +451,15 @@ namespace InGame.Player
             // ダメージ適用.
             playerStatusModel.Damage(damage);
 
-            // 鼓動上昇: 被弾時受けた減少HP×0.85倍.
-            pulseModel.OnDamageTaken(damage);
+            // 鼓動上昇: 現在の鼓動値×0.3.
+            pulseModel.OnDamageTaken();
+
+            // スタン中に被弾 → スタン解除.
+            if (isPulseMaxStunning && damage > 0)
+            {
+                stunInterruptedByDamage = true;
+                Debug.Log("[PlayerPresenter] スタン中に被弾 - スタン解除");
+            }
 
             // 吹き飛ばし処理（Powerlevelで上回った場合のみ）.
             if (canKnockback)
@@ -677,6 +713,7 @@ namespace InGame.Player
         private async UniTaskVoid ExecutePulseMaxStunAsync()
         {
             isPulseMaxStunning = true;
+            stunInterruptedByDamage = false;
             Debug.Log($"[PlayerPresenter] 鼓動200到達 - 接地待機中 pulse: {pulseModel.GetPulseGauge()}");
 
             // 行動不可にする.
@@ -693,7 +730,7 @@ namespace InGame.Player
             guardSEPlayer?.Play("SE_Stan");
 
             // スタンアニメーション再生.
-            playerAnimation?.PlayTrigger("Hurt");
+            playerAnimation?.PlayTrigger("Sutan");
 
             // スタンエフェクト再生.
             var stunAvator = playerModel.GetAvator();
@@ -702,11 +739,15 @@ namespace InGame.Player
                 PlayerEffectPool.Instance(false).Spawn("PlayerEffect_Stun", stunAvator.transform.position, stunAvator.transform, loop: true);
             }
 
+            // 接地待機中に受けたダメージによるフラグをリセット（ループ開始直前）.
+            stunInterruptedByDamage = false;
+
             // 3秒間かけて鼓動を100まで減少 (100ポイント / 3秒 ≒ 秒間33.3減少).
             float stunDuration = 3f;
             float decreasePerSecond = 100f / stunDuration;
             float elapsed = 0f;
-            while (elapsed < stunDuration)
+            Debug.Log($"[PlayerPresenter] スタンループ開始 - duration: {stunDuration}s, pulse: {pulseModel.GetPulseGauge()}");
+            while (elapsed < stunDuration && !stunInterruptedByDamage)
             {
                 // 攻撃asyncの完了による上書きを防止: 毎フレーム行動不可を強制維持.
                 playerModel.SetEnableAction(true);
@@ -715,14 +756,28 @@ namespace InGame.Player
                 pulseModel.ReduceBreachingPoint(decreasePerSecond * dt);
                 await UniTask.Yield();
             }
-            pulseModel.SetPulseGauge(100f);
+            Debug.Log($"[PlayerPresenter] スタンループ終了 - elapsed: {elapsed:F2}s, interrupted: {stunInterruptedByDamage}, pulse: {pulseModel.GetPulseGauge()}");
+
+            if (stunInterruptedByDamage)
+            {
+                Debug.Log("[PlayerPresenter] スタン被弾中断 - 鼓動維持して行動再開");
+            }
+            else
+            {
+                pulseModel.SetPulseGauge(100f);
+            }
 
             // スタンエフェクト停止.
             PlayerEffectPool.Instance(false).StopAll("PlayerEffect_Stun");
 
+            // スタン終了アニメーション再生.
+            playerAnimation?.PlayTrigger("EndSutan");
+            Debug.Log("[PlayerPresenter] EndSutan トリガー発火");
+
             // 行動可能に戻す.
             playerModel.SetEnableAction(false);
             isPulseMaxStunning = false;
+            stunInterruptedByDamage = false;
         }
 
         /// <summary>

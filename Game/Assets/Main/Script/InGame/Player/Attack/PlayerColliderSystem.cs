@@ -232,6 +232,7 @@ namespace InGame.Player
     /// </summary>
     public enum PlayerAttackType
     {
+        None,       // 未指定.
         Weak,       // 弱攻撃: 0.12秒.
         Normal,     // 通常攻撃: 0.2秒.
         Iai         // 居合: 0.3秒.
