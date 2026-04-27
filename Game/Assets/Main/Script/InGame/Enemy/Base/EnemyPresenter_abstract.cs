@@ -66,6 +66,12 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
     [SerializeField]
     protected Animator attackWarningAnimator;
 
+    // 被弾バウンスエフェクト.
+    protected EnemyHitBounce hitBounce;
+
+    // 画面外インジケーター.
+    protected EnemyOffScreenIndicator offScreenIndicator;
+
     // SE再生用.
     protected SEClipRegistry seRegistry;
     protected SEPlayer sePlayer;
@@ -111,6 +117,14 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
         Debug.Log($"[EnemyPresenter_abstract] Animator: {(animator != null ? "取得" : "null")}");
 
         InitComponents();
+
+        // 被弾バウンスコンポーネント追加.
+        hitBounce = gameObject.GetComponent<EnemyHitBounce>();
+        if (hitBounce == null)
+        {
+            hitBounce = gameObject.AddComponent<EnemyHitBounce>();
+        }
+
         Debug.Log($"[EnemyPresenter_abstract] InitComponents完了 - model: {(model != null ? "生成" : "null")}, status: {(status != null ? "生成" : "null")}");
 
         if (model != null)
@@ -144,6 +158,49 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
         // EnemyUIViewのsetterがnullでなくなったらEnemyNameをセット.
         WaitAndSetEnemyName().Forget();
 
+        // 画面外インジケーター初期化.
+        InitializeOffScreenIndicator().Forget();
+    }
+
+    /// <summary>
+    /// 画面外インジケーターを初期化.
+    /// Addressablesから"EnemyOffScreenIndicator"プレハブを読み込み、Canvas下にインスタンス化する.
+    /// プレハブが未登録の場合はスキップする.
+    /// </summary>
+    private async UniTaskVoid InitializeOffScreenIndicator()
+    {
+        try
+        {
+            // Canvas を検索.
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null)
+            {
+                Debug.LogWarning("[EnemyPresenter_abstract] Canvas が見つかりません。画面外インジケーターをスキップ.");
+                return;
+            }
+
+            var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<GameObject>("EnemyOffScreenIndicator");
+            GameObject prefab = await handle;
+
+            if (handle.Status != UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationStatus.Succeeded)
+            {
+                UnityEngine.AddressableAssets.Addressables.Release(handle);
+                return;
+            }
+
+            GameObject indicatorObj = Instantiate(prefab, canvas.transform);
+            offScreenIndicator = indicatorObj.GetComponent<EnemyOffScreenIndicator>();
+            if (offScreenIndicator != null)
+            {
+                offScreenIndicator.Initialize(transform, canvas);
+            }
+
+            UnityEngine.AddressableAssets.Addressables.Release(handle);
+        }
+        catch (System.Exception)
+        {
+            // Addressable未登録の場合はエラーを出さずにスキップ.
+        }
     }
 
     /// <summary>
@@ -207,5 +264,12 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
         }
         seRegistry?.Clear();
         seRegistry = null;
+
+        // 画面外インジケーター破棄.
+        if (offScreenIndicator != null)
+        {
+            Destroy(offScreenIndicator.gameObject);
+            offScreenIndicator = null;
+        }
     }
 }

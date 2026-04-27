@@ -145,6 +145,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 5f8dd013d88cdf74e9ab8d166970a82e
+    m_Address: EnemyOffScreenIndicator
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 63ab686381f7e5c4faa70f9cdc093d4d
     m_Address: EnemyView
     m_ReadOnly: 0

@@ -111,9 +111,9 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         colliderState.ClearHitTargets();
         colliderState.SetDamage(jumpSlashDamage);
 
-        // アニメーション: "Jamp"トリガー（ユーザー指定のスペル）.
-        animator.ResetTrigger("EndJanp");
-        animator.SetTrigger("Jamp");
+        // アニメーション: "Jump"トリガー.
+        animator.ResetTrigger("EndJump");
+        animator.SetTrigger("Jump");
 
         // 攻撃通告: パリィ不可.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
@@ -250,12 +250,14 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
         // 着地処理.
+        Debug.Log($"[JumpSlash] 着地検出 - hasLanded: {hasLanded}, airTime: {airTimeElapsed:F2}s, pos: {ownerTransform.position}");
         rb.linearVelocity = Vector2.zero;
 
         // 着地アニメーション終了トリガー.
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
-            animator.SetTrigger("EndJanp");
+            Debug.Log("[JumpSlash] EndJump トリガー発火");
+            animator.SetTrigger("EndJump");
         }
 
         // 着地位置をスナップ（isTrigger中は物理衝突しないため手動で地面に合わせる）.
@@ -290,8 +292,8 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             {
                 if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) return true;
                 var stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-                // Jampアニメーションが終了したら終了.
-                return !stateInfo.IsName("Jamp") || stateInfo.normalizedTime >= 1f;
+                // Jumpアニメーションが終了したら終了.
+                return !stateInfo.IsName("Jump") || stateInfo.normalizedTime >= 1f;
             });
     }
 
@@ -303,8 +305,8 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
 
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
-            animator.ResetTrigger("Jamp");
-            animator.SetTrigger("EndJanp");
+            animator.ResetTrigger("Jump");
+            animator.SetTrigger("EndJump");
         }
         await UniTask.CompletedTask;
     }

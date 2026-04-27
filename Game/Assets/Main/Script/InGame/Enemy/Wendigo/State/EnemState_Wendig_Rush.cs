@@ -29,6 +29,7 @@ public class EnemState_Wendig_Rush : EnemState_abstract
     private float effectiveRushSpeed;
     private bool stateModified = false;
     private int originalLayer = -1;
+    private AfterimageEffect afterimageEffect;
 
     public EnemState_Wendig_Rush()
     {
@@ -155,6 +156,14 @@ public class EnemState_Wendig_Rush : EnemState_abstract
 
         animator.SetTrigger("Assault_Assault");
 
+        // 残像エフェクト開始.
+        afterimageEffect = ownerTransform.GetComponent<AfterimageEffect>();
+        if (afterimageEffect == null)
+        {
+            afterimageEffect = ownerTransform.gameObject.AddComponent<AfterimageEffect>();
+        }
+        afterimageEffect.StartEffect();
+
         // 逆端まで突進.
         while (Mathf.Abs(ownerTransform.position.x - oppositeEdgeX) > 0.5f)
         {
@@ -182,6 +191,9 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         {
             mainColl.gameObject.layer = mainCollOriginalLayer;
         }
+
+        // 残像エフェクト停止.
+        afterimageEffect?.StopEffect();
 
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
         rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);

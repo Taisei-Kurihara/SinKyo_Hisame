@@ -1,0 +1,533 @@
+fileFormatVersion: 2
+guid: 7c37844a494614f43a9138118b6c62c3
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: -7047921662373592273
+    second: EF_SlashWave_0
+  - first:
+      213: -3974970512952547323
+    second: EF_SlashWave_1
+  - first:
+      213: 5806698217760626104
+    second: EF_SlashWave_2
+  - first:
+      213: 6768254504759416034
+    second: EF_SlashWave_3
+  - first:
+      213: -7361863764709379009
+    second: EF_SlashWave_4
+  - first:
+      213: 497313355449390062
+    second: EF_SlashWave_5
+  - first:
+      213: 2844326024385546958
+    second: EF_SlashWave_6
+  - first:
+      213: -2826981877673252902
+    second: EF_SlashWave_7
+  - first:
+      213: -6907831799464601789
+    second: EF_SlashWave_8
+  - first:
+      213: 9006989466767529152
+    second: EF_SlashWave_9
+  - first:
+      213: 2396838120095928374
+    second: EF_SlashWave_10
+  - first:
+      213: 4199660925509572847
+    second: EF_SlashWave_11
+  - first:
+      213: -2988934078142717140
+    second: EF_SlashWave_12
+  - first:
+      213: -4238452754527849672
+    second: EF_SlashWave_13
+  - first:
+      213: 3883897629447546641
+    second: EF_SlashWave_14
+  - first:
+      213: -4300681267485745561
+    second: EF_SlashWave_15
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: EF_SlashWave_0
+      rect:
+        serializedVersion: 2
+        x: 278
+        y: 576
+        width: 17
+        height: 165
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f23017de690c03e90800000000000000
+      internalID: -7047921662373592273
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_1
+      rect:
+        serializedVersion: 2
+        x: 300
+        y: 660
+        width: 17
+        height: 192
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 508afc6f06116d8c0800000000000000
+      internalID: -3974970512952547323
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_2
+      rect:
+        serializedVersion: 2
+        x: 317
+        y: 711
+        width: 9
+        height: 187
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8b5148b8349859050800000000000000
+      internalID: 5806698217760626104
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_3
+      rect:
+        serializedVersion: 2
+        x: 88
+        y: 10
+        width: 84
+        height: 667
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2e45f91cc9baded50800000000000000
+      internalID: 6768254504759416034
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_4
+      rect:
+        serializedVersion: 2
+        x: 218
+        y: 1
+        width: 70
+        height: 672
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f347dab29e765d990800000000000000
+      internalID: -7361863764709379009
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_5
+      rect:
+        serializedVersion: 2
+        x: 306
+        y: 454
+        width: 9
+        height: 126
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ee35e95acdfc6e600800000000000000
+      internalID: 497313355449390062
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_6
+      rect:
+        serializedVersion: 2
+        x: 68
+        y: 191
+        width: 9
+        height: 170
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: eca46e40373197720800000000000000
+      internalID: 2844326024385546958
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_7
+      rect:
+        serializedVersion: 2
+        x: 304
+        y: 235
+        width: 9
+        height: 197
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ad7a1d2d5fa84c8d0800000000000000
+      internalID: -2826981877673252902
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_8
+      rect:
+        serializedVersion: 2
+        x: 344
+        y: 120
+        width: 11
+        height: 221
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 347d3c0e3937220a0800000000000000
+      internalID: -6907831799464601789
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_9
+      rect:
+        serializedVersion: 2
+        x: 53
+        y: 0
+        width: 8
+        height: 96
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0c41d5ee2314ffc70800000000000000
+      internalID: 9006989466767529152
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_10
+      rect:
+        serializedVersion: 2
+        x: 79
+        y: 0
+        width: 26
+        height: 49
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 630de6c3297434120800000000000000
+      internalID: 2396838120095928374
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_11
+      rect:
+        serializedVersion: 2
+        x: 152
+        y: 0
+        width: 44
+        height: 131
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fe8161a6c51384a30800000000000000
+      internalID: 4199660925509572847
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_12
+      rect:
+        serializedVersion: 2
+        x: 196
+        y: 0
+        width: 9
+        height: 27
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c236e3fba4c2586d0800000000000000
+      internalID: -2988934078142717140
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_13
+      rect:
+        serializedVersion: 2
+        x: 291
+        y: 0
+        width: 20
+        height: 136
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 83377111dadfd25c0800000000000000
+      internalID: -4238452754527849672
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_14
+      rect:
+        serializedVersion: 2
+        x: 317
+        y: 0
+        width: 9
+        height: 5
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 117e333f05066e530800000000000000
+      internalID: 3883897629447546641
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_SlashWave_15
+      rect:
+        serializedVersion: 2
+        x: 326
+        y: 0
+        width: 9
+        height: 34
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 76ed5575c29e054c0800000000000000
+      internalID: -4300681267485745561
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      EF_SlashWave_0: -7047921662373592273
+      EF_SlashWave_1: -3974970512952547323
+      EF_SlashWave_10: 2396838120095928374
+      EF_SlashWave_11: 4199660925509572847
+      EF_SlashWave_12: -2988934078142717140
+      EF_SlashWave_13: -4238452754527849672
+      EF_SlashWave_14: 3883897629447546641
+      EF_SlashWave_15: -4300681267485745561
+      EF_SlashWave_2: 5806698217760626104
+      EF_SlashWave_3: 6768254504759416034
+      EF_SlashWave_4: -7361863764709379009
+      EF_SlashWave_5: 497313355449390062
+      EF_SlashWave_6: 2844326024385546958
+      EF_SlashWave_7: -2826981877673252902
+      EF_SlashWave_8: -6907831799464601789
+      EF_SlashWave_9: 9006989466767529152
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

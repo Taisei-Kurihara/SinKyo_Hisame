@@ -80,12 +80,14 @@ namespace InGame.Player
         }
 
         /// <summary>
-        /// 敵からの攻撃を受ける: 現在の鼓動値×0.35.
+        /// 敵からの攻撃を受ける: 現在の鼓動値×0.3.
         /// </summary>
         public void OnDamageTaken()
         {
-            float increase = pulseGauge.Value * 0.35f;
+            float before = pulseGauge.Value;
+            float increase = pulseGauge.Value * 0.3f;
             pulseGauge.Value = Math.Clamp(pulseGauge.Value + increase, minPulseGauge, maxPulseGauge);
+            Debug.Log($"[PulseModel] OnDamageTaken - 被弾鼓動上昇: {before} → {pulseGauge.Value} (+{increase})");
             OnPulseIncreased();
         }
 

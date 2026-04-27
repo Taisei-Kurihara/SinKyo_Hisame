@@ -37,6 +37,20 @@ public abstract class EnemyStatus_abstract : MonoBehaviour
         Debug.Log($"[EnemyStatus_abstract] OnDamaged - {gameObject.name}, Damage: {damage}, 現在HP: {hp.Value}");
         aschangeHP ??= defaultDamage;
         await aschangeHP.OnHPChange(this, damage);
+
+        // 被弾バウンスエフェクト（プレイヤーの位置から攻撃方向を算出）.
+        var hitBounce = GetComponent<EnemyHitBounce>();
+        if (hitBounce != null && damage > 0)
+        {
+            float attackDirX = 1f;
+            var player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                attackDirX = Mathf.Sign(player.transform.position.x - transform.position.x);
+            }
+            hitBounce.Bounce(attackDirX);
+        }
+
         Debug.Log($"[EnemyStatus_abstract] OnDamaged完了 - 残りHP: {hp.Value}");
     }
 
