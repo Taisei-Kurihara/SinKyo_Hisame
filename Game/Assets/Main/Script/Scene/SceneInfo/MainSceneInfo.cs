@@ -33,6 +33,8 @@ namespace SceneInfo
             var playerEffectPool = PlayerEffectPool.Instance(false);
             await playerEffectPool.InitPool("PlayerEffect_Stun", 1);
             await playerEffectPool.InitPool("PlayerEffect_Heal", 3);
+            await playerEffectPool.InitPool("UP", 2);
+            await playerEffectPool.InitPool("Down", 2);
             Debug.Log("[MainSceneInfo] エフェクトプール初期化完了 → BGM読み込み開始");
 
             // BGM再生（ビルド版ではawaitしないとAddressables読み込み完了前にフローが終了する）.

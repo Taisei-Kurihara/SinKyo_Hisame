@@ -24,6 +24,9 @@ public class AfterimageEffect : MonoBehaviour
     [Tooltip("残像のSortingOrder オフセット（元のスプライトの背後に描画）")]
     [SerializeField] private int sortingOrderOffset = -1;
 
+    // 残像スケール倍率（1.0 = 本体と同じ）.
+    private float scaleMultiplier = 1f;
+
     // 残像のプール.
     private List<AfterimageInstance> pool = new List<AfterimageInstance>();
     private SpriteRenderer sourceSpriteRenderer;
@@ -61,6 +64,38 @@ public class AfterimageEffect : MonoBehaviour
     }
 
     /// <summary>
+    /// 残像の色を外部から設定.
+    /// </summary>
+    public void SetColor(Color color)
+    {
+        afterimageColor = color;
+    }
+
+    /// <summary>
+    /// 残像のフェード持続時間を外部から設定.
+    /// </summary>
+    public void SetFadeDuration(float duration)
+    {
+        fadeDuration = duration;
+    }
+
+    /// <summary>
+    /// 残像の生成間隔を外部から設定.
+    /// </summary>
+    public void SetSpawnInterval(float interval)
+    {
+        spawnInterval = interval;
+    }
+
+    /// <summary>
+    /// 残像のスケール倍率を外部から設定（1.0 = 本体と同じ）.
+    /// </summary>
+    public void SetScaleMultiplier(float multiplier)
+    {
+        scaleMultiplier = multiplier;
+    }
+
+    /// <summary>
     /// SpriteRendererを外部から設定.
     /// </summary>
     public void SetSourceRenderer(SpriteRenderer renderer)
@@ -93,6 +128,10 @@ public class AfterimageEffect : MonoBehaviour
     public void StopEffect()
     {
         isEffectActive = false;
+        // パラメータをデフォルトに戻す.
+        scaleMultiplier = 1f;
+        fadeDuration = 0.3f;
+        spawnInterval = 0.04f;
     }
 
     private void Update()
@@ -176,10 +215,10 @@ public class AfterimageEffect : MonoBehaviour
         instance.spriteRenderer.sortingLayerID = sourceSpriteRenderer.sortingLayerID;
         instance.spriteRenderer.sortingOrder = sourceSpriteRenderer.sortingOrder + sortingOrderOffset;
 
-        // 位置・回転・スケールをコピー.
+        // 位置・回転・スケールをコピー（スケール倍率を適用）.
         instance.gameObject.transform.position = sourceSpriteRenderer.transform.position;
         instance.gameObject.transform.rotation = sourceSpriteRenderer.transform.rotation;
-        instance.gameObject.transform.localScale = sourceSpriteRenderer.transform.lossyScale;
+        instance.gameObject.transform.localScale = sourceSpriteRenderer.transform.lossyScale * scaleMultiplier;
     }
 
     private AfterimageInstance CreateInstance()

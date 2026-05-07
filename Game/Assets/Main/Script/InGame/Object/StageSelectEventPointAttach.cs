@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using GameCommon;
 using Common;
 using InGame.Enemy;
@@ -20,6 +21,10 @@ namespace GameEventPoint
         [Tooltip("Enemy名")]
         [SerializeField] private MissionTag enemyName = MissionTag.Enemy_Wendigo;
 
+        [Header("長押しゲージUI")]
+        [Tooltip("長押し進行率を表示する Fill Image")]
+        [SerializeField] private Image holdGaugeImage;
+
         /// <summary>選択中のミッションタグ（全カテゴリ合成）.</summary>
         public MissionTag SelectedTags => difficulty | condition | enemyName;
 
@@ -40,6 +45,14 @@ namespace GameEventPoint
 
             // MainSceneInfo で敵生成を含むシーンをロード.
             SceneManager.Instance().LoadMainScene(new MainSceneInfo()).Forget();
+        }
+
+        protected override void OnHoldProgress(float progress)
+        {
+            if (holdGaugeImage != null)
+            {
+                holdGaugeImage.fillAmount = progress;
+            }
         }
 
         /// <summary>

@@ -81,6 +81,13 @@ namespace InGame.Player
         private const float jakComboResetTime = 0.33f;
         private const int jakComboMaxCount = 3;
 
+        // 心拍エフェクト方向トラッキング.
+        private float previousPulseValue = 100f;
+        private int pulseDirection = 0;  // +1=上昇, -1=下降, 0=未定.
+        private float pulseEffectCooldown = 0f;
+        private const float pulseEffectSameDirectionInterval = 1.5f;  // 同方向の場合のクールダウン（秒）.
+        private const float pulseChangeThreshold = 0.5f;  // 方向判定の閾値.
+
         private CompositeDisposable compositeDisposePlayer=new CompositeDisposable();
 
         /// <summary>
@@ -161,6 +168,33 @@ namespace InGame.Player
                         playerAnimation?.ClearActionAnimatorSpeed();
                         playerAnimation?.PlayTrigger("Jak_End");
                         jakComboCount = 0;
+                    }
+
+                    // 心拍エフェクト方向検出（累積方式）.
+                    // previousPulseValue はエフェクト発火 or 方向確定時のみ更新.
+                    // 緩やかな変化でも累積で閾値を超えれば検出される.
+                    float currentPulse = pulseModel.GetPulseGauge();
+                    float accumulatedDelta = currentPulse - previousPulseValue;
+                    pulseEffectCooldown -= UnityEngine.Time.fixedDeltaTime;
+
+                    if (Mathf.Abs(accumulatedDelta) >= pulseChangeThreshold)
+                    {
+                        int newDirection = accumulatedDelta > 0f ? 1 : -1;
+                        bool directionChanged = (pulseDirection != 0 && newDirection != pulseDirection);
+
+                        if (directionChanged || pulseEffectCooldown <= 0f)
+                        {
+                            var pulseAvator = playerModel.GetAvator();
+                            if (pulseAvator != null)
+                            {
+                                string effectName = newDirection > 0 ? "UP" : "Down";
+                                PlayerEffectPool.Instance(false).Spawn(effectName, pulseAvator.transform.position, pulseAvator.transform);
+                            }
+                            pulseEffectCooldown = pulseEffectSameDirectionInterval;
+                        }
+
+                        pulseDirection = newDirection;
+                        previousPulseValue = currentPulse;
                     }
                 })
                 );
@@ -421,11 +455,12 @@ namespace InGame.Player
                     drainModel?.Increment(25);
                 }
 
-                // Powerlevelで上回られた場合は強制防御解除.
+                // Powerlevelで上回られた場合は強制防御解除 + ダメージ3割軽減.
                 if (guard.IsOverpowered(attackPowerlevel))
                 {
+                    damage = (int)(damage * 0.7f);
                     ForceGuardEnd();
-                    Debug.Log($"[PlayerPresenter] Powerlevel上回られ - 強制防御解除 (攻撃:{attackPowerlevel} > ガード:{guard.GetGuardPowerlevel()})");
+                    Debug.Log($"[PlayerPresenter] Powerlevel上回られ - 強制防御解除 + ダメージ3割軽減: {damage} (攻撃:{attackPowerlevel} > ガード:{guard.GetGuardPowerlevel()})");
                 }
                 else if (state == GuardState.Parry)
                 {

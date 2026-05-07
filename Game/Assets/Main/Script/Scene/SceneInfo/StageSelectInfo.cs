@@ -28,6 +28,8 @@ namespace SceneInfo {
             var playerEffectPool = PlayerEffectPool.Instance(false);
             await playerEffectPool.InitPool("PlayerEffect_Stun", 1);
             await playerEffectPool.InitPool("PlayerEffect_Heal", 3);
+            await playerEffectPool.InitPool("UP", 2);
+            await playerEffectPool.InitPool("Down", 2);
 
             // BGM再生（ビルド版ではawaitしないとAddressables読み込み完了前にフローが終了する）.
             await AudioManager.Instance().LoadBgm("BGM_BaseHome");

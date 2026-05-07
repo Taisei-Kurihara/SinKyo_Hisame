@@ -69,8 +69,7 @@ namespace GameCommon
                 holdValue += holdSpeed * Time.deltaTime;
                 holdValue = Mathf.Clamp(holdValue, 0f, holdMaxValue);
 
-                // 必要ならここでUI更新
-                // OnHoldProgress(holdValue / holdMaxValue);
+                OnHoldProgress(holdValue / holdMaxValue);
 
                 if (holdValue >= holdMaxValue)
                 {
@@ -83,8 +82,7 @@ namespace GameCommon
                 if (resetOnRelease)
                 {
                     holdValue = 0f;
-                    // 必要ならここでUI更新
-                    // OnHoldProgress(0f);
+                    OnHoldProgress(0f);
                 }
             }
         }
@@ -121,6 +119,11 @@ namespace GameCommon
         }
 
 
+
+        /// <summary>
+        /// 長押し進行率コールバック（0.0〜1.0）.
+        /// </summary>
+        protected virtual void OnHoldProgress(float progress) { }
 
         /// <summary>
         /// 何かイベントを書いていく
