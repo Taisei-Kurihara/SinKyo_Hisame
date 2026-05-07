@@ -33,6 +33,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
     private bool originalIsTrigger;
     private bool stateModified = false;
     private int originalLayer = -1;
+    private AfterimageEffect afterimageEffect;
 
     // ターゲット位置（AI側から設定）.
     private Vector3 targetPosition;
@@ -166,6 +167,16 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
 
         // 初速度設定.
         rb.linearVelocity = new Vector2(vx, vy);
+
+        // 赤い残像エフェクト開始（ジャンプ開始時）.
+        afterimageEffect = ownerTransform.GetComponent<AfterimageEffect>();
+        if (afterimageEffect == null)
+        {
+            afterimageEffect = ownerTransform.gameObject.AddComponent<AfterimageEffect>();
+        }
+        afterimageEffect.SetColor(new Color(1f, 0.2f, 0.2f, 0.6f));
+        afterimageEffect.SetFadeDuration(0.6f);
+        afterimageEffect.StartEffect();
     }
 
     protected override async UniTask OnAction(EnemyModel_abstract enemyModel)
@@ -248,6 +259,9 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         }
 
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
+
+        // 残像エフェクト停止（着地時）.
+        afterimageEffect?.StopEffect();
 
         // 着地処理.
         Debug.Log($"[JumpSlash] 着地検出 - hasLanded: {hasLanded}, airTime: {airTimeElapsed:F2}s, pos: {ownerTransform.position}");
