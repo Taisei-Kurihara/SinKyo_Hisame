@@ -218,10 +218,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
                         animator.ResetTrigger("Attack_End");
                         animator.SetTrigger("Attack");
 
-                        // 空中攻撃中のみレイヤーを変更.
-                        originalLayer = EnemColliderHelper.SetAttackLayer(ownerTransform);
-
-                        // 空中近接攻撃コライダー発動（短時間）.
+                        // 空中近接攻撃コライダー発動（レイヤー変更はExecuteColliderPhase内部で行う）.
                         colliderState.ClearHitTargets();
                         colliderState.SetDamage(jumpSlashDamage);
                         await EnemColliderHelper.ExecuteColliderPhase(
@@ -237,10 +234,6 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
                             },
                             300f,
                             enemyModel.AnimSpeed);
-
-                        // 空中攻撃終了: レイヤーを復元.
-                        EnemColliderHelper.RestoreLayer(ownerTransform, originalLayer);
-                        originalLayer = -1;
 
                         // 攻撃アニメーション終了.
                         animator.ResetTrigger("Attack");
@@ -286,8 +279,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             mainColl.isTrigger = originalIsTrigger;
         }
 
-        // 着地攻撃: レイヤーを変更してコライダー発動.
-        originalLayer = EnemColliderHelper.SetAttackLayer(ownerTransform);
+        // 着地攻撃: コライダー発動（レイヤー変更はExecuteColliderPhaseUntil内部で行う）.
         colliderState.ClearHitTargets();
         colliderState.SetDamage(jumpSlashDamage);
 

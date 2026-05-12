@@ -37,6 +37,8 @@ namespace InGame.Player
         // ---- 基本アクセス ----
         public float GetPulseGauge() => pulseGauge.Value;
         public void SetPulseGauge(float v) => pulseGauge.Value = Math.Clamp(v, minPulseGauge, maxPulseGauge);
+        public float GetBasePulseGauge() => basePulseGauge;
+        public float GetIdleDecreaseMax() => maxIdleDecrease;
 
         /// <summary>
         /// 鼓動ゲージを基準値(100)にリセット.

@@ -30,6 +30,8 @@ namespace Common
 
         // Note: フェード用オブジェクトは StartFadeIn/StartFadeOut で直接管理
 
+        // シーンロード中の再入防止フラグ.
+        private bool _isLoadingMainScene = false;
 
         /// <summary>
         /// 単一シーンロード:メイン
@@ -37,6 +39,14 @@ namespace Common
         /// <param name="mainSceneInfo"></param>
         public async UniTask LoadMainScene(ISceneInfo mainSceneInfo)
         {
+            // 再入防止：既にロード中なら無視.
+            if (_isLoadingMainScene)
+            {
+                Debug.LogWarning("[SceneManager] LoadMainScene - 既にロード中のためスキップ.");
+                return;
+            }
+            _isLoadingMainScene = true;
+
             if( _mainSceneInfo != null)
             {
                 //終了処理
@@ -88,6 +98,9 @@ namespace Common
                         // ここで確実にログ出力する.
                         Debug.LogError($"[SceneManager] Init()で例外発生: {_mainSceneInfo.GetType().Name} | {e}");
                     }
+
+                    // 再入防止フラグをリセット.
+                    _isLoadingMainScene = false;
                 }
             }
         }

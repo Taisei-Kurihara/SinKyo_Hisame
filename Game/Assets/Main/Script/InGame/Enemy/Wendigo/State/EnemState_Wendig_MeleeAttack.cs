@@ -12,6 +12,9 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
     // ヒット処理.
     private EnemColliderState_Wendig_MeleeAttack colliderState = new EnemColliderState_Wendig_MeleeAttack();
 
+    // 攻撃前の溜め時間（秒）.
+    private float attackPreDelay = 1.0f;
+
     // ライフサイクル間共有データ.
     private int attackDamage;
 
@@ -37,8 +40,19 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
         colliderState.ClearHitTargets();
         colliderState.SetDamage(attackDamage);
 
-        // 前回のAttack_Endトリガーが残留している場合に備えてリセット.
+        // 前回のトリガーが残留している場合に備えてリセット.
         enemyModel.Animator.ResetTrigger("Attack_End");
+        enemyModel.Animator.ResetTrigger("Attack");
+
+        // === 溜めアニメーション ===.
+        enemyModel.Animator.SetTrigger("Attack_Pre");
+
+        // 溜め時間待機（attackPreDelayで調整可能）.
+        int preDelayMs = (int)(attackPreDelay * 1000f / animSpeed);
+        await UniTask.Delay(preDelayMs);
+        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
+
+        // === 攻撃アニメーション開始 ===.
         enemyModel.Animator.SetTrigger("Attack");
 
         // === 前段階 ===.

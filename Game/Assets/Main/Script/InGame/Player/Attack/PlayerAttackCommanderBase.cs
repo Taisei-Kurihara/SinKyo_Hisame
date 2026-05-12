@@ -571,8 +571,7 @@ namespace InGame.Player
                 }
 
                 // Zan 表示 + コライダー有効化（攻撃タイプでカラー切替）.
-                bool isIai = (attackType == PlayerAttackType.Iai);
-                zanController.Show(isIai);
+                zanController.Show(attackType);
 
                 try
                 {
