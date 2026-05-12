@@ -749,17 +749,14 @@ namespace InGame.Player
         {
             isPulseMaxStunning = true;
             stunInterruptedByDamage = false;
-            Debug.Log($"[PlayerPresenter] 鼓動200到達 - 接地待機中 pulse: {pulseModel.GetPulseGauge()}");
+            Debug.Log($"[PlayerPresenter] 鼓動200到達 - スタン即時開始 pulse: {pulseModel.GetPulseGauge()}");
 
-            // 行動不可にする.
+            // 行動不可にする（着地前から即座に開始）.
             playerModel.SetEnableAction(true);
             EndJakComboIfActive();
             ForceGuardEnd();
 
-            // 接地するまで待機（通常の鼓動減少もisPulseMaxStunning=trueで停止中）.
-            await UniTask.WaitUntil(() => playerModel.isGround.Value);
-
-            Debug.Log("[PlayerPresenter] 接地確認 - スタン開始");
+            Debug.Log("[PlayerPresenter] スタン開始");
 
             // スタンSE再生.
             guardSEPlayer?.Play("SE_Stan");
@@ -777,18 +774,31 @@ namespace InGame.Player
             // 接地待機中に受けたダメージによるフラグをリセット（ループ開始直前）.
             stunInterruptedByDamage = false;
 
-            // 3秒間かけて鼓動を100まで減少 (100ポイント / 3秒 ≒ 秒間33.3減少).
+            // スタン時間（鼓動減少とは独立）.
             float stunDuration = 3f;
-            float decreasePerSecond = 100f / stunDuration;
+            // スタン中の鼓動減少速度（秒間50: 約2秒で200→100）.
+            float decreasePerSecond = 50f;
             float elapsed = 0f;
-            Debug.Log($"[PlayerPresenter] スタンループ開始 - duration: {stunDuration}s, pulse: {pulseModel.GetPulseGauge()}");
+            Debug.Log($"[PlayerPresenter] スタンループ開始 - duration: {stunDuration}s, pulse: {pulseModel.GetPulseGauge()}, decrease/s: {decreasePerSecond}");
             while (elapsed < stunDuration && !stunInterruptedByDamage)
             {
                 // 攻撃asyncの完了による上書きを防止: 毎フレーム行動不可を強制維持.
                 playerModel.SetEnableAction(true);
                 float dt = UnityEngine.Time.deltaTime;
                 elapsed += dt;
-                pulseModel.ReduceBreachingPoint(decreasePerSecond * dt);
+
+                // 鼓動を減少させ、100以下にならないようにクランプ.
+                float currentPulse = pulseModel.GetPulseGauge();
+                if (currentPulse > pulseModel.GetBasePulseGauge())
+                {
+                    float newPulse = currentPulse - decreasePerSecond * dt;
+                    if (newPulse < pulseModel.GetBasePulseGauge())
+                    {
+                        newPulse = pulseModel.GetBasePulseGauge();
+                    }
+                    pulseModel.SetPulseGauge(newPulse);
+                }
+
                 await UniTask.Yield();
             }
             Debug.Log($"[PlayerPresenter] スタンループ終了 - elapsed: {elapsed:F2}s, interrupted: {stunInterruptedByDamage}, pulse: {pulseModel.GetPulseGauge()}");
@@ -799,7 +809,8 @@ namespace InGame.Player
             }
             else
             {
-                pulseModel.SetPulseGauge(100f);
+                // スタン終了時に100に戻す（念のため）.
+                pulseModel.SetPulseGauge(pulseModel.GetBasePulseGauge());
             }
 
             // スタンエフェクト停止.
@@ -893,9 +904,6 @@ namespace InGame.Player
                         () =>
                         {
                             ShowGameOver(true);
-
-                            Debug.Log("[GameOverEventer] タイトルへ戻る");
-                            SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
                         }
                     );
                     Debug.Log($"[PlayerPresenter] Enemy死亡条件登録完了 - {enemy.gameObject.name}");

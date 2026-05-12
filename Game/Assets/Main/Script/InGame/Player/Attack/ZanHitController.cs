@@ -19,7 +19,8 @@ public class ZanHitController : MonoBehaviour
 
     // 攻撃タイプ別カラー.
     private static readonly Color iaiColor = new Color(0.3f, 0.7f, 0.7f, 1f);
-    private static readonly Color defaultAttackColor = new Color(1f, 0.1f, 0f, 1f);
+    private static readonly Color weakAttackColor = new Color(1f, 0.7f, 0f, 1f);
+    private static readonly Color normalAttackColor = new Color(0.45f, 0f, 0f, 1f);
 
     private void Awake()
     {
@@ -108,14 +109,25 @@ public class ZanHitController : MonoBehaviour
     /// <summary>
     /// Zan を表示して当たり判定を有効化.
     /// </summary>
-    public void Show(bool isIai)
+    public void Show(PlayerAttackType attackType)
     {
         gameObject.SetActive(true);
 
         // 攻撃タイプに応じてカラー設定.
         if (spriteRenderer != null)
         {
-            spriteRenderer.color = isIai ? iaiColor : defaultAttackColor;
+            switch (attackType)
+            {
+                case PlayerAttackType.Iai:
+                    spriteRenderer.color = iaiColor;
+                    break;
+                case PlayerAttackType.Weak:
+                    spriteRenderer.color = weakAttackColor;
+                    break;
+                default:
+                    spriteRenderer.color = normalAttackColor;
+                    break;
+            }
         }
 
         polyCollider.enabled = true;
