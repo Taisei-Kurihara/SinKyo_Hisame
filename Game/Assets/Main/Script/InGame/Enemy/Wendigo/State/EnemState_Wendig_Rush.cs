@@ -168,7 +168,7 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         afterimageEffect.StartEffect();
 
         // 逆端まで突進.
-        while (Mathf.Abs(ownerTransform.position.x - oppositeEdgeX) > 0.5f)
+        while (ownerTransform != null && Mathf.Abs(ownerTransform.position.x - oppositeEdgeX) > 0.5f)
         {
             if (!EnemNullSafetyHelper.IsValid(enemyModel))
             {

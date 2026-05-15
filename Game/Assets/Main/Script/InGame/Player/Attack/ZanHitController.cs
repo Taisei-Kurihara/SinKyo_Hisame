@@ -130,7 +130,7 @@ public class ZanHitController : MonoBehaviour
             }
         }
 
-        polyCollider.enabled = true;
+        if (polyCollider != null) polyCollider.enabled = true;
     }
 
     /// <summary>
@@ -138,7 +138,7 @@ public class ZanHitController : MonoBehaviour
     /// </summary>
     public void Hide()
     {
-        polyCollider.enabled = false;
+        if (polyCollider != null) polyCollider.enabled = false;
         // α=0 にしてから非アクティブ.
         if (spriteRenderer != null)
         {

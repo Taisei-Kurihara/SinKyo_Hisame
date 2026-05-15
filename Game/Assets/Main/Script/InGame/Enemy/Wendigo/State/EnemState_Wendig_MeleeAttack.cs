@@ -47,18 +47,21 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
         // === 溜めアニメーション ===.
         enemyModel.Animator.SetTrigger("Attack_Pre");
 
-        // 溜め時間待機（attackPreDelayで調整可能）.
-        int preDelayMs = (int)(attackPreDelay * 1000f / animSpeed);
-        await UniTask.Delay(preDelayMs);
-        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
-
-        // === 攻撃アニメーション開始 ===.
-        enemyModel.Animator.SetTrigger("Attack");
-
-        // === 前段階 ===.
-        // 200ms待機 → 攻撃通告(パリィ可能) → 300ms待機.
+        // 攻撃通告（Attack_Pre溜め中に実行: パリィ可能）.
+        // 200ms待機 → 攻撃通告 → 300ms待機.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
             enemyModel, 500f, true, 300f, animSpeed)) { isAborted = true; return; }
+
+        // 溜めの残り待機.
+        int remainingMs = (int)((attackPreDelay * 1000f - 500f) / animSpeed);
+        if (remainingMs > 0)
+        {
+            await UniTask.Delay(remainingMs);
+        }
+        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
+
+        // === 攻撃アニメーション開始（= 攻撃タイミング）===.
+        enemyModel.Animator.SetTrigger("Attack");
     }
 
     protected override async UniTask OnAction(EnemyModel_abstract enemyModel)

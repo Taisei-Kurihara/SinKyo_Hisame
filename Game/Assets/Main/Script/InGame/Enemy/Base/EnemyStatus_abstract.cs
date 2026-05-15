@@ -66,8 +66,8 @@ public abstract class EnemyStatus_abstract : MonoBehaviour
     {
         Debug.Log($"[EnemyStatus_abstract] Dead開始 - {gameObject.name}");
         await DeadAnim();
-        Debug.Log($"[EnemyStatus_abstract] DeadAnim完了 - GameObject破棄");
-        Destroy(this.gameObject);
+        Debug.Log($"[EnemyStatus_abstract] DeadAnim完了");
+        // Destroy処理はDeathManagerに移譲.
     }
 
     protected virtual UniTask DeadAnim()

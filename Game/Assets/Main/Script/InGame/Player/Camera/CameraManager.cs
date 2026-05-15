@@ -35,6 +35,9 @@ namespace Common
         private bool isShaking = false;
         private Vector3 initialLocalPos;
 
+        // timeScale=0中でもカメラ動作を有効にするフラグ.
+        public bool UseUnscaledTime { get; set; } = false;
+
 
 
 
@@ -74,10 +77,11 @@ namespace Common
                 }
 
                 // スムーズに追従.
+                float dt = UseUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
                 mainCamera.transform.position = Vector3.Lerp(
                     mainCamera.transform.position,
                     targetPos,
-                    followSpeed * Time.deltaTime
+                    followSpeed * dt
                 );
             }
         }
@@ -203,6 +207,8 @@ namespace Common
         {
             followerObject = target;
         }
+
+        public Transform GetFollowTarget() => followerObject;
 
         public void EnableFollow() => isFollowing = true;
         public void DisableFollow() => isFollowing = false;
@@ -407,7 +413,7 @@ namespace Common
                 float t = 0f;
                 while (!token.IsCancellationRequested && t < 1f)
                 {
-                    t += Time.deltaTime * s;
+                    t += (UseUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime) * s;
                     if (mainCamera.orthographic)
                         mainCamera.orthographicSize = Mathf.Lerp(start, target, t);
                     else

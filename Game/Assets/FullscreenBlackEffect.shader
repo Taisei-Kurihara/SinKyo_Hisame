@@ -3,6 +3,7 @@ Shader "Custom/FullscreenBlackEffect"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
+        _Blend ("Blend", Range(0, 1)) = 1
     }
 
     SubShader
@@ -41,6 +42,7 @@ Shader "Custom/FullscreenBlackEffect"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
+            float _Blend;
 
             Varyings Vert(Attributes input)
             {
@@ -54,6 +56,11 @@ Shader "Custom/FullscreenBlackEffect"
                 output.positionHCS = float4(pos * 2.0 - 1.0, 0.0, 1.0);
                 output.uv = pos;
 
+                // Direct3Dのレンダーテクスチャ描画時UV反転補正.
+                #if UNITY_UV_STARTS_AT_TOP
+                output.uv.y = 1.0 - output.uv.y;
+                #endif
+
                 return output;
             }
 
@@ -65,12 +72,12 @@ Shader "Custom/FullscreenBlackEffect"
                     input.uv
                 );
 
-                // ���������͂��̂܂�
+                // 背景判定: alpha≈0 は背景 → 白塗り.
                 if (color.a <= 0.01)
-                    return color;
+                    return half4(1, 1, 1, _Blend);
 
-                // �`�悳��Ă��镔��������
-                return half4(0, 0, 0, color.a);
+                // オブジェクト部分を黒塗り（_Blendで強度制御）.
+                return half4(0, 0, 0, color.a * _Blend);
             }
 
             ENDHLSL

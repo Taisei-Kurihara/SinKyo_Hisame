@@ -175,10 +175,16 @@ public abstract class EnemAIUpdater_abstract
                 await UniTask.Yield(linkedToken);
                 loopCount++;
             }
+            catch (MissingReferenceException e)
+            {
+                // Destroyされたオブジェクトへのアクセス → ループ終了.
+                Debug.LogWarning($"[EnemAIUpdater] Destroyされたオブジェクトアクセス検出 - ループ終了: {e.Message}");
+                break;
+            }
             catch (System.Exception e) when (e is not System.OperationCanceledException)
             {
                 Debug.LogError($"[EnemAIUpdater] 例外発生: {e.Message}");
-                if (masterAI.OwnerModel == null || masterAI.OwnerModel.Presenter == null) break;
+                if (masterAI == null || masterAI.OwnerModel == null || masterAI.OwnerModel.Presenter == null) break;
                 throw;
             }
         }
