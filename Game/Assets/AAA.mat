@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: xxx
-  m_Shader: {fileID: 4800000, guid: 261b9de6d2a07d443a24472ea6c98bee, type: 3}
+  m_Name: AAA
+  m_Shader: {fileID: 4800000, guid: 476938b27405c7743b7a615e930ae3c4, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -41,7 +41,6 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Blend: 0.0018291473
     - _EnableExternalAlpha: 0
     - _ZWrite: 0
     m_Colors:

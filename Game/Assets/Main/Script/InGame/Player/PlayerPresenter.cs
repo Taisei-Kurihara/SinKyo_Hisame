@@ -849,34 +849,12 @@ namespace InGame.Player
             var titleSceneInfo = new TitleSceneInfo();
             var sceneChangeStand = SceneChangeStand.Instance();
 
-            // Player死亡条件登録.
+            // Player死亡条件登録（死亡通知・シーン遷移はDeathManager経由で実行）.
             var playerDeathCondition = new DeathCondition(playerStatusModel.hp, 2.5f);
-            sceneChangeStand.RegisterCondition(
-                playerDeathCondition,
-                titleSceneInfo,
-                () =>
-                {
-                    ShowGameOver(false);
-                }
-            );
+            sceneChangeStand.RegisterCondition(playerDeathCondition, titleSceneInfo);
 
             // Enemy死亡条件登録.
             RegisterEnemyDeathConditionsAsync(titleSceneInfo).Forget();
-        }
-
-        /// <summary>
-        /// ゲームオーバー画面を表示（タイトル遷移はボタン押下で行う）.
-        /// </summary>
-        /// <param name="isVictory">勝利の場合true.</param>
-        private void ShowGameOver(bool isVictory)
-        {
-            if (gameOverView != null)
-            {
-                gameOverView.Show(isVictory);
-            }
-
-            Debug.Log("[GameOverEventer] タイトルへ戻る");
-            SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
         }
 
         /// <summary>
@@ -890,22 +868,13 @@ namespace InGame.Player
             var enemies = UnityEngine.Object.FindObjectsByType<EnemyPresenter_abstract>(FindObjectsSortMode.None);
             var sceneChangeStand = SceneChangeStand.Instance();
 
-            // カメラ境界はStageBoundsMarker + CameraBoundsUI ベースに移行.
-            // CameraManager.Start() で自動適用される.
-
             foreach (var enemy in enemies)
             {
                 if (enemy.Status != null)
                 {
+                    // Enemy死亡条件登録（死亡通知・シーン遷移はDeathManager経由で実行）.
                     var enemyDeathCondition = new DeathCondition(enemy.Status.hp, 2.5f);
-                    sceneChangeStand.RegisterCondition(
-                        enemyDeathCondition,
-                        titleSceneInfo,
-                        () =>
-                        {
-                            ShowGameOver(true);
-                        }
-                    );
+                    sceneChangeStand.RegisterCondition(enemyDeathCondition, titleSceneInfo);
                     Debug.Log($"[PlayerPresenter] Enemy死亡条件登録完了 - {enemy.gameObject.name}");
                 }
             }

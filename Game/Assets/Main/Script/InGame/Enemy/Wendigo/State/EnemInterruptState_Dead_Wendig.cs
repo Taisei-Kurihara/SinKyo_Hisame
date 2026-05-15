@@ -1,5 +1,6 @@
 using UnityEngine;
 using Cysharp.Threading.Tasks;
+using InGame.Common;
 
 // Wendig用 Dead割り込みState.
 public class EnemInterruptState_Dead_Wendig : EnemInterruptState_Dead_abstract
@@ -19,14 +20,9 @@ public class EnemInterruptState_Dead_Wendig : EnemInterruptState_Dead_abstract
             return;
         }
 
-        // AIループを停止.
-        enemyModel.EnemAIStop();
-        Debug.Log($"[EnemInterruptState_Dead_Wendig] AIループ停止");
+        // DeathManagerに死亡を通知（AI停止等はDeathManager経由で実行）.
+        await DeathManager.Instance.NotifyEnemyDeath();
 
-        // GameObjectを破棄（既存の処理）.
-        Object.Destroy(enemyModel.gameObject);
-        Debug.Log($"[EnemInterruptState_Dead_Wendig] GameObject破棄");
-
-        await UniTask.CompletedTask;
+        Debug.Log($"[EnemInterruptState_Dead_Wendig] OnDeathComplete完了");
     }
 }

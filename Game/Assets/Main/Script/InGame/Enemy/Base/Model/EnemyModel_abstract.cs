@@ -41,6 +41,14 @@ public abstract class EnemyModel_abstract : MonoBehaviour
     // アニメーション速度を取得.
     public float AnimSpeed => animator != null ? animator.speed : 1f;
 
+    // 初期位置リセット設定（距離超過で初期位置に戻す）.
+    [Header("初期位置リセット")]
+    [SerializeField] protected float resetDistance = 100f;
+    [SerializeField] protected float resetDelay = 0f;
+    private Vector3 initialPosition;
+    private float outOfRangeTimer = 0f;
+    private bool initialPositionSet = false;
+
     // Platform検出（Awakeで初期化 — Unity APIはフィールド初期化子から呼べないため）.
     protected PlatformDetector platformDetector;
 
@@ -126,6 +134,40 @@ public abstract class EnemyModel_abstract : MonoBehaviour
                     transform.position += new Vector3(0f, clampDiff, 0f);
                 }
             }
+        }
+
+        // 初期位置からの距離チェック.
+        CheckInitialPositionReset();
+    }
+
+    /// <summary>
+    /// 初期位置からresetDistance以上離れた状態がresetDelay秒以上続いたら初期位置に戻す.
+    /// </summary>
+    private void CheckInitialPositionReset()
+    {
+        // 初回呼び出し時に初期位置を記録.
+        if (!initialPositionSet)
+        {
+            initialPosition = transform.position;
+            initialPositionSet = true;
+            return;
+        }
+
+        float dist = Vector2.Distance(transform.position, initialPosition);
+        if (dist > resetDistance)
+        {
+            outOfRangeTimer += Time.fixedDeltaTime;
+            if (outOfRangeTimer >= resetDelay)
+            {
+                transform.position = initialPosition;
+                if (rigidbody != null) rigidbody.linearVelocity = Vector2.zero;
+                outOfRangeTimer = 0f;
+                Debug.Log($"[EnemyModel_abstract] 初期位置リセット - {gameObject.name} (距離: {dist:F1}m)");
+            }
+        }
+        else
+        {
+            outOfRangeTimer = 0f;
         }
     }
 
