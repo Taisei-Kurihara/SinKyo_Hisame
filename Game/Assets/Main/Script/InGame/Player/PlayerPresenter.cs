@@ -81,6 +81,13 @@ namespace InGame.Player
         private const float jakComboResetTime = 0.33f;
         private const int jakComboMaxCount = 3;
 
+        // 心拍エフェクト方向トラッキング.
+        private float previousPulseValue = 100f;
+        private int pulseDirection = 0;  // +1=上昇, -1=下降, 0=未定.
+        private float pulseEffectCooldown = 0f;
+        private const float pulseEffectSameDirectionInterval = 1.5f;  // 同方向の場合のクールダウン（秒）.
+        private const float pulseChangeThreshold = 0.5f;  // 方向判定の閾値.
+
         private CompositeDisposable compositeDisposePlayer=new CompositeDisposable();
 
         /// <summary>
@@ -161,6 +168,33 @@ namespace InGame.Player
                         playerAnimation?.ClearActionAnimatorSpeed();
                         playerAnimation?.PlayTrigger("Jak_End");
                         jakComboCount = 0;
+                    }
+
+                    // 心拍エフェクト方向検出（累積方式）.
+                    // previousPulseValue はエフェクト発火 or 方向確定時のみ更新.
+                    // 緩やかな変化でも累積で閾値を超えれば検出される.
+                    float currentPulse = pulseModel.GetPulseGauge();
+                    float accumulatedDelta = currentPulse - previousPulseValue;
+                    pulseEffectCooldown -= UnityEngine.Time.fixedDeltaTime;
+
+                    if (Mathf.Abs(accumulatedDelta) >= pulseChangeThreshold)
+                    {
+                        int newDirection = accumulatedDelta > 0f ? 1 : -1;
+                        bool directionChanged = (pulseDirection != 0 && newDirection != pulseDirection);
+
+                        if (directionChanged || pulseEffectCooldown <= 0f)
+                        {
+                            var pulseAvator = playerModel.GetAvator();
+                            if (pulseAvator != null)
+                            {
+                                string effectName = newDirection > 0 ? "UP" : "Down";
+                                PlayerEffectPool.Instance(false).Spawn(effectName, pulseAvator.transform.position, pulseAvator.transform);
+                            }
+                            pulseEffectCooldown = pulseEffectSameDirectionInterval;
+                        }
+
+                        pulseDirection = newDirection;
+                        previousPulseValue = currentPulse;
                     }
                 })
                 );
@@ -421,11 +455,12 @@ namespace InGame.Player
                     drainModel?.Increment(25);
                 }
 
-                // Powerlevelで上回られた場合は強制防御解除.
+                // Powerlevelで上回られた場合は強制防御解除 + ダメージ3割軽減.
                 if (guard.IsOverpowered(attackPowerlevel))
                 {
+                    damage = (int)(damage * 0.7f);
                     ForceGuardEnd();
-                    Debug.Log($"[PlayerPresenter] Powerlevel上回られ - 強制防御解除 (攻撃:{attackPowerlevel} > ガード:{guard.GetGuardPowerlevel()})");
+                    Debug.Log($"[PlayerPresenter] Powerlevel上回られ - 強制防御解除 + ダメージ3割軽減: {damage} (攻撃:{attackPowerlevel} > ガード:{guard.GetGuardPowerlevel()})");
                 }
                 else if (state == GuardState.Parry)
                 {
@@ -714,17 +749,14 @@ namespace InGame.Player
         {
             isPulseMaxStunning = true;
             stunInterruptedByDamage = false;
-            Debug.Log($"[PlayerPresenter] 鼓動200到達 - 接地待機中 pulse: {pulseModel.GetPulseGauge()}");
+            Debug.Log($"[PlayerPresenter] 鼓動200到達 - スタン即時開始 pulse: {pulseModel.GetPulseGauge()}");
 
-            // 行動不可にする.
+            // 行動不可にする（着地前から即座に開始）.
             playerModel.SetEnableAction(true);
             EndJakComboIfActive();
             ForceGuardEnd();
 
-            // 接地するまで待機（通常の鼓動減少もisPulseMaxStunning=trueで停止中）.
-            await UniTask.WaitUntil(() => playerModel.isGround.Value);
-
-            Debug.Log("[PlayerPresenter] 接地確認 - スタン開始");
+            Debug.Log("[PlayerPresenter] スタン開始");
 
             // スタンSE再生.
             guardSEPlayer?.Play("SE_Stan");
@@ -742,18 +774,31 @@ namespace InGame.Player
             // 接地待機中に受けたダメージによるフラグをリセット（ループ開始直前）.
             stunInterruptedByDamage = false;
 
-            // 3秒間かけて鼓動を100まで減少 (100ポイント / 3秒 ≒ 秒間33.3減少).
+            // スタン時間（鼓動減少とは独立）.
             float stunDuration = 3f;
-            float decreasePerSecond = 100f / stunDuration;
+            // スタン中の鼓動減少速度（秒間50: 約2秒で200→100）.
+            float decreasePerSecond = 50f;
             float elapsed = 0f;
-            Debug.Log($"[PlayerPresenter] スタンループ開始 - duration: {stunDuration}s, pulse: {pulseModel.GetPulseGauge()}");
+            Debug.Log($"[PlayerPresenter] スタンループ開始 - duration: {stunDuration}s, pulse: {pulseModel.GetPulseGauge()}, decrease/s: {decreasePerSecond}");
             while (elapsed < stunDuration && !stunInterruptedByDamage)
             {
                 // 攻撃asyncの完了による上書きを防止: 毎フレーム行動不可を強制維持.
                 playerModel.SetEnableAction(true);
                 float dt = UnityEngine.Time.deltaTime;
                 elapsed += dt;
-                pulseModel.ReduceBreachingPoint(decreasePerSecond * dt);
+
+                // 鼓動を減少させ、100以下にならないようにクランプ.
+                float currentPulse = pulseModel.GetPulseGauge();
+                if (currentPulse > pulseModel.GetBasePulseGauge())
+                {
+                    float newPulse = currentPulse - decreasePerSecond * dt;
+                    if (newPulse < pulseModel.GetBasePulseGauge())
+                    {
+                        newPulse = pulseModel.GetBasePulseGauge();
+                    }
+                    pulseModel.SetPulseGauge(newPulse);
+                }
+
                 await UniTask.Yield();
             }
             Debug.Log($"[PlayerPresenter] スタンループ終了 - elapsed: {elapsed:F2}s, interrupted: {stunInterruptedByDamage}, pulse: {pulseModel.GetPulseGauge()}");
@@ -764,7 +809,8 @@ namespace InGame.Player
             }
             else
             {
-                pulseModel.SetPulseGauge(100f);
+                // スタン終了時に100に戻す（念のため）.
+                pulseModel.SetPulseGauge(pulseModel.GetBasePulseGauge());
             }
 
             // スタンエフェクト停止.
@@ -803,34 +849,12 @@ namespace InGame.Player
             var titleSceneInfo = new TitleSceneInfo();
             var sceneChangeStand = SceneChangeStand.Instance();
 
-            // Player死亡条件登録.
+            // Player死亡条件登録（死亡通知・シーン遷移はDeathManager経由で実行）.
             var playerDeathCondition = new DeathCondition(playerStatusModel.hp, 2.5f);
-            sceneChangeStand.RegisterCondition(
-                playerDeathCondition,
-                titleSceneInfo,
-                () =>
-                {
-                    ShowGameOver(false);
-                }
-            );
+            sceneChangeStand.RegisterCondition(playerDeathCondition, titleSceneInfo);
 
             // Enemy死亡条件登録.
             RegisterEnemyDeathConditionsAsync(titleSceneInfo).Forget();
-        }
-
-        /// <summary>
-        /// ゲームオーバー画面を表示（タイトル遷移はボタン押下で行う）.
-        /// </summary>
-        /// <param name="isVictory">勝利の場合true.</param>
-        private void ShowGameOver(bool isVictory)
-        {
-            if (gameOverView != null)
-            {
-                gameOverView.Show(isVictory);
-            }
-
-            Debug.Log("[GameOverEventer] タイトルへ戻る");
-            SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
         }
 
         /// <summary>
@@ -844,25 +868,13 @@ namespace InGame.Player
             var enemies = UnityEngine.Object.FindObjectsByType<EnemyPresenter_abstract>(FindObjectsSortMode.None);
             var sceneChangeStand = SceneChangeStand.Instance();
 
-            // カメラ境界はStageBoundsMarker + CameraBoundsUI ベースに移行.
-            // CameraManager.Start() で自動適用される.
-
             foreach (var enemy in enemies)
             {
                 if (enemy.Status != null)
                 {
+                    // Enemy死亡条件登録（死亡通知・シーン遷移はDeathManager経由で実行）.
                     var enemyDeathCondition = new DeathCondition(enemy.Status.hp, 2.5f);
-                    sceneChangeStand.RegisterCondition(
-                        enemyDeathCondition,
-                        titleSceneInfo,
-                        () =>
-                        {
-                            ShowGameOver(true);
-
-                            Debug.Log("[GameOverEventer] タイトルへ戻る");
-                            SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
-                        }
-                    );
+                    sceneChangeStand.RegisterCondition(enemyDeathCondition, titleSceneInfo);
                     Debug.Log($"[PlayerPresenter] Enemy死亡条件登録完了 - {enemy.gameObject.name}");
                 }
             }

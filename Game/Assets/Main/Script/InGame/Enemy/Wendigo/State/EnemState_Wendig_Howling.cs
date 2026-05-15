@@ -10,6 +10,8 @@ public class EnemState_Wendig_Howling : EnemState_abstract
 
     // ライフサイクル間共有データ.
     private int attackDamage;
+    private Transform ownerTransform;
+    private AfterimageEffect afterimageEffect;
 
     public EnemState_Wendig_Howling()
     {
@@ -41,7 +43,18 @@ public class EnemState_Wendig_Howling : EnemState_abstract
     {
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
+        ownerTransform = enemyModel.Presenter.transform;
         float animSpeed = enemyModel.AnimSpeed;
+
+        // 赤い残像エフェクト開始.
+        afterimageEffect = ownerTransform.GetComponent<AfterimageEffect>();
+        if (afterimageEffect == null)
+        {
+            afterimageEffect = ownerTransform.gameObject.AddComponent<AfterimageEffect>();
+        }
+        afterimageEffect.SetColor(new Color(1f, 0.2f, 0.2f, 0.6f));
+        afterimageEffect.SetScaleMultiplier(1.2f);
+        afterimageEffect.StartEffect();
 
         // 円形の攻撃判定を生成し400ms維持.
         var colliderState = new EnemColliderState_Wendig_Howling();
@@ -60,6 +73,9 @@ public class EnemState_Wendig_Howling : EnemState_abstract
                 colliderState = colliderState
             },
             400f, animSpeed);
+
+        // 残像エフェクト停止.
+        afterimageEffect?.StopEffect();
     }
 
     protected override async UniTask OnAfterPostAction(EnemyModel_abstract enemyModel)

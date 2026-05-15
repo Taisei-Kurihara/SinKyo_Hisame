@@ -162,10 +162,13 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         {
             afterimageEffect = ownerTransform.gameObject.AddComponent<AfterimageEffect>();
         }
+        afterimageEffect.SetColor(new Color(1f, 0.2f, 0.2f, 0.6f));
+        afterimageEffect.SetFadeDuration(0.6f);
+        afterimageEffect.SetSpawnInterval(0.015f);
         afterimageEffect.StartEffect();
 
         // 逆端まで突進.
-        while (Mathf.Abs(ownerTransform.position.x - oppositeEdgeX) > 0.5f)
+        while (ownerTransform != null && Mathf.Abs(ownerTransform.position.x - oppositeEdgeX) > 0.5f)
         {
             if (!EnemNullSafetyHelper.IsValid(enemyModel))
             {

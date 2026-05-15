@@ -33,6 +33,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
     private bool originalIsTrigger;
     private bool stateModified = false;
     private int originalLayer = -1;
+    private AfterimageEffect afterimageEffect;
 
     // ターゲット位置（AI側から設定）.
     private Vector3 targetPosition;
@@ -166,6 +167,16 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
 
         // 初速度設定.
         rb.linearVelocity = new Vector2(vx, vy);
+
+        // 赤い残像エフェクト開始（ジャンプ開始時）.
+        afterimageEffect = ownerTransform.GetComponent<AfterimageEffect>();
+        if (afterimageEffect == null)
+        {
+            afterimageEffect = ownerTransform.gameObject.AddComponent<AfterimageEffect>();
+        }
+        afterimageEffect.SetColor(new Color(1f, 0.2f, 0.2f, 0.6f));
+        afterimageEffect.SetFadeDuration(0.6f);
+        afterimageEffect.StartEffect();
     }
 
     protected override async UniTask OnAction(EnemyModel_abstract enemyModel)
@@ -207,10 +218,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
                         animator.ResetTrigger("Attack_End");
                         animator.SetTrigger("Attack");
 
-                        // 空中攻撃中のみレイヤーを変更.
-                        originalLayer = EnemColliderHelper.SetAttackLayer(ownerTransform);
-
-                        // 空中近接攻撃コライダー発動（短時間）.
+                        // 空中近接攻撃コライダー発動（レイヤー変更はExecuteColliderPhase内部で行う）.
                         colliderState.ClearHitTargets();
                         colliderState.SetDamage(jumpSlashDamage);
                         await EnemColliderHelper.ExecuteColliderPhase(
@@ -226,10 +234,6 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
                             },
                             300f,
                             enemyModel.AnimSpeed);
-
-                        // 空中攻撃終了: レイヤーを復元.
-                        EnemColliderHelper.RestoreLayer(ownerTransform, originalLayer);
-                        originalLayer = -1;
 
                         // 攻撃アニメーション終了.
                         animator.ResetTrigger("Attack");
@@ -248,6 +252,9 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         }
 
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
+
+        // 残像エフェクト停止（着地時）.
+        afterimageEffect?.StopEffect();
 
         // 着地処理.
         Debug.Log($"[JumpSlash] 着地検出 - hasLanded: {hasLanded}, airTime: {airTimeElapsed:F2}s, pos: {ownerTransform.position}");
@@ -272,8 +279,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             mainColl.isTrigger = originalIsTrigger;
         }
 
-        // 着地攻撃: レイヤーを変更してコライダー発動.
-        originalLayer = EnemColliderHelper.SetAttackLayer(ownerTransform);
+        // 着地攻撃: コライダー発動（レイヤー変更はExecuteColliderPhaseUntil内部で行う）.
         colliderState.ClearHitTargets();
         colliderState.SetDamage(jumpSlashDamage);
 

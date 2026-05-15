@@ -2453,7 +2453,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 4178792062395464018}
   - {fileID: 7786123483817025476}
   - {fileID: 466015054}
   - {fileID: 435491078}
@@ -2483,7 +2482,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 4294967295
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 6198f20de17b0d94380a080437934d1e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -2610,12 +2609,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3878506882523440968}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0.0705, y: -0.0152, z: 0}
   m_LocalScale: {x: 3.3750634, y: 3.3812923, z: 3.7257457}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1773670466843031631}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &4178792062395464019
 MonoBehaviour:
@@ -2820,6 +2819,7 @@ SceneRoots:
   m_Roots:
   - {fileID: 153479569}
   - {fileID: 1029430064}
+  - {fileID: 4178792062395464018}
   - {fileID: 1773670466843031631}
   - {fileID: 54705345}
   - {fileID: 1813595182}

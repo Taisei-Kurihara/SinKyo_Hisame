@@ -12,6 +12,9 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
     // ヒット処理.
     private EnemColliderState_Wendig_MeleeAttack colliderState = new EnemColliderState_Wendig_MeleeAttack();
 
+    // 攻撃前の溜め時間（秒）.
+    private float attackPreDelay = 1.0f;
+
     // ライフサイクル間共有データ.
     private int attackDamage;
 
@@ -37,14 +40,28 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
         colliderState.ClearHitTargets();
         colliderState.SetDamage(attackDamage);
 
-        // 前回のAttack_Endトリガーが残留している場合に備えてリセット.
+        // 前回のトリガーが残留している場合に備えてリセット.
         enemyModel.Animator.ResetTrigger("Attack_End");
-        enemyModel.Animator.SetTrigger("Attack");
+        enemyModel.Animator.ResetTrigger("Attack");
 
-        // === 前段階 ===.
-        // 200ms待機 → 攻撃通告(パリィ可能) → 300ms待機.
+        // === 溜めアニメーション ===.
+        enemyModel.Animator.SetTrigger("Attack_Pre");
+
+        // 攻撃通告（Attack_Pre溜め中に実行: パリィ可能）.
+        // 200ms待機 → 攻撃通告 → 300ms待機.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
             enemyModel, 500f, true, 300f, animSpeed)) { isAborted = true; return; }
+
+        // 溜めの残り待機.
+        int remainingMs = (int)((attackPreDelay * 1000f - 500f) / animSpeed);
+        if (remainingMs > 0)
+        {
+            await UniTask.Delay(remainingMs);
+        }
+        if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
+
+        // === 攻撃アニメーション開始（= 攻撃タイミング）===.
+        enemyModel.Animator.SetTrigger("Attack");
     }
 
     protected override async UniTask OnAction(EnemyModel_abstract enemyModel)

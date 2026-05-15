@@ -4,6 +4,10 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using System;
+#if UNITY_EDITOR
+using Cysharp.Threading.Tasks;
+using InGame.Common;
+#endif
 
 namespace InGame.Player
 {
@@ -43,6 +47,9 @@ namespace InGame.Player
         [SerializeField] private float hpColorThresholdHigh = 0.8f;
         [SerializeField] private float hpColorThresholdLow = 0.4f;
 
+        [SerializeField] private CanvasGroup statusUI;
+        [SerializeField] private CanvasGroup win;
+        [SerializeField] private CanvasGroup lose;
         // 心拍数ゲージアニメーション用.
         private float targetHeartFill = 0.25f;
         private float currentHeartFill = 0.25f;
@@ -110,6 +117,16 @@ namespace InGame.Player
 
         private void Update()
         {
+#if UNITY_EDITOR
+            // デバッグ: Nキーで Enemy死亡処理を呼び出し.
+            if (Input.GetKeyDown(KeyCode.N))
+            {
+                // 前回の状態をリセットして再実行可能に.
+                DeathManager.Instance.DebugReset();
+                DeathManager.Instance.NotifyEnemyDeath().Forget();
+            }
+#endif
+
             // HPゲージを0.5秒かけてシームレスに補間.
             if (HpGauge != null && !Mathf.Approximately(HpGauge.fillAmount, targetHpPercent))
             {
@@ -186,6 +203,26 @@ namespace InGame.Player
             }
             SetDrainGages(0);
             drainUI.MaxLine.localPosition = new Vector2(((float)num * 45f) + 22.5f, 0);
+        }
+
+        // ---- 演出用alpha制御 ----
+
+        // ステータスUI全体のalpha設定.
+        public void SetStatusUIAlpha(float alpha)
+        {
+            if (statusUI != null) statusUI.alpha = alpha;
+        }
+
+        // 勝利UIのalpha設定.
+        public void SetWinAlpha(float alpha)
+        {
+            if (win != null) win.alpha = alpha;
+        }
+
+        // 敗北UIのalpha設定.
+        public void SetLoseAlpha(float alpha)
+        {
+            if (lose != null) lose.alpha = alpha;
         }
 
     }

@@ -63,6 +63,8 @@ namespace InGame.Common
 
                 Debug.Log($"[DeathCondition] HP <= 0 検知. {_delaySeconds}秒後に条件達成.");
 
+                OnHpZeroDetected();
+
                 // 遅延待機.
                 await UniTask.Delay(TimeSpan.FromSeconds(_delaySeconds), cancellationToken: token);
 
@@ -73,6 +75,22 @@ namespace InGame.Common
             {
                 Debug.Log("[DeathCondition] 条件キャンセル.");
                 return false;
+            }
+        }
+
+        // HP0検知時の処理.
+        // DeathManagerに死亡を通知（GameOverView表示・シーン遷移はDeathManager側で実行）.
+        private void OnHpZeroDetected()
+        {
+            if (_playerHp != null)
+            {
+                Debug.Log("[DeathCondition] プレイヤー死亡検知 → DeathManager通知");
+                DeathManager.Instance.NotifyPlayerDeath().Forget();
+            }
+            else if (_enemyHp != null)
+            {
+                Debug.Log("[DeathCondition] Enemy死亡検知 → DeathManager通知");
+                DeathManager.Instance.NotifyEnemyDeath().Forget();
             }
         }
 

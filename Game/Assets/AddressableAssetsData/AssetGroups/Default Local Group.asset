@@ -225,6 +225,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a253451033c77a047b420a24efd62cc6
+    m_Address: Down
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a34b8da5c359f2045abe04beffc0ceb3
     m_Address: Assets/Main/UI/Original/Player/heart/heart_02.png
     m_ReadOnly: 0
@@ -297,6 +302,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bbd62467a85075940965ea86bede9b81
     m_Address: GameOverView
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bf7fb13564ad23c448ba5a6f67f54846
+    m_Address: UP
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
