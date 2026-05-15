@@ -15,15 +15,13 @@ namespace Audio
     {
         private AudioSource audioSource;
 
-        // AudioClip名 : AudioClip の辞書.
+        // AudioClip名 : AudioClip.
         private readonly Dictionary<string, AudioClip> clips = new();
 
         // Addressableハンドル管理（解放用）.
         private readonly Dictionary<string, AsyncOperationHandle<AudioClip>> handles = new();
 
-        /// <summary>
-        /// AudioSourceを取得.
-        /// </summary>
+        /// <summary> AudioSourceを取得.  </summary>
         public AudioSource GetAudioSource() => audioSource;
 
         private void Awake()
@@ -36,9 +34,7 @@ namespace Audio
             audioSource.playOnAwake = false;
         }
 
-        /// <summary>
-        /// SEPlayerを持つGameObjectを生成して返す.
-        /// </summary>
+        /// <summary> SEPlayerを持つGameObjectを生成して返す. </summary>
         public static SEPlayer Create(string objectName = "SEPlayer")
         {
             GameObject obj = new GameObject(objectName);
@@ -48,9 +44,7 @@ namespace Audio
             return player;
         }
 
-        /// <summary>
-        /// SEClipRegistryからAudioClipをAddressablesで読み込んで辞書登録.
-        /// </summary>
+        /// <summary>  SEClipRegistryからAudioClipをAddressablesで読み込んで辞書登録. </summary>
         public async UniTask LoadClipsFromRegistry(SEClipRegistry registry, params string[] actionNames)
         {
             List<UniTask> loadTasks = new();
@@ -67,9 +61,7 @@ namespace Audio
             await UniTask.WhenAll(loadTasks);
         }
 
-        /// <summary>
-        /// AddressablesからAudioClipを読み込んで辞書登録.
-        /// </summary>
+        /// <summary> AddressablesからAudioClipを読み込んで辞書登録. </summary>
         public async UniTask LoadClipAsync(string clipAddress)
         {
             if (clips.ContainsKey(clipAddress))
@@ -103,9 +95,7 @@ namespace Audio
             }
         }
 
-        /// <summary>
-        /// 複数のAudioClipを一括読み込み.
-        /// </summary>
+        /// <summary> 複数のAudioClipを一括読み込み. </summary>
         public async UniTask LoadClipsAsync(params string[] clipAddresses)
         {
             List<UniTask> loadTasks = new();
@@ -116,37 +106,13 @@ namespace Audio
             await UniTask.WhenAll(loadTasks);
         }
 
-        /// <summary>
-        /// 指定されたAudioClipを再生.
-        /// </summary>
-        public void Play(string clipName)
-        {
-            if (clips.TryGetValue(clipName, out var clip))
-            {
-                audioSource.PlayOneShot(clip);
-            }
-            else
-            {
-                Debug.LogWarning($"[SEPlayer] AudioClip '{clipName}' が登録されていません.");
-            }
-        }
+        /// <summary> AudioClipが登録されているか確認. </summary>
+        public bool HasClip(string clipName) => clips.ContainsKey(clipName);
 
-        /// <summary>
-        /// SEClipRegistryのアクション名でAudioClipを再生.
-        /// </summary>
-        public void PlayByAction(SEClipRegistry registry, string actionName)
-        {
-            string clipName = registry.GetClipName(actionName);
-            if (!string.IsNullOrEmpty(clipName))
-            {
-                Play(clipName);
-            }
-        }
+        #region 再生処理
 
-        /// <summary>
-        /// 指定されたAudioClipを音量指定で再生.
-        /// </summary>
-        public void Play(string clipName, float volume)
+        /// <summary> 指定されたAudioClipを再生. </summary>
+        public void Play(string clipName, float volume = 1)
         {
             if (clips.TryGetValue(clipName, out var clip))
             {
@@ -158,17 +124,22 @@ namespace Audio
             }
         }
 
-        /// <summary>
-        /// AudioClipが登録されているか確認.
-        /// </summary>
-        public bool HasClip(string clipName)
+        /// <summary> SEClipRegistryのアクション名でAudioClipを再生. </summary>
+        public void PlayByAction(SEClipRegistry registry, string actionName)
         {
-            return clips.ContainsKey(clipName);
+            string clipName = registry.GetClipName(actionName);
+            if (!string.IsNullOrEmpty(clipName))
+            {
+                Play(clipName);
+            }
         }
 
-        /// <summary>
-        /// 全てのAudioClipリソースを解放.
-        /// </summary>
+        #endregion
+
+
+
+        #region リリース処理
+        /// <summary> 全てのAudioClipリソースを解放. </summary>
         public void ReleaseAll()
         {
             foreach (var kvp in handles)
@@ -182,9 +153,7 @@ namespace Audio
             clips.Clear();
         }
 
-        /// <summary>
-        /// 指定されたAudioClipリソースを解放.
-        /// </summary>
+        /// <summary> 指定されたAudioClipリソースを解放. </summary>
         public void Release(string clipName)
         {
             if (handles.TryGetValue(clipName, out var handle))
@@ -202,5 +171,6 @@ namespace Audio
         {
             ReleaseAll();
         }
+        #endregion
     }
 }

@@ -14,12 +14,8 @@ public class EnemyPresenter_Wendig : EnemyPresenter_abstract
     // model/statusのAddComponentを行う.
     protected override void InitComponents()
     {
-        //Debug.Log($"[EnemyPresenter_Wendig] InitComponents開始 - {gameObject.name}");
         model = gameObject.AddComponent<EnemyModel_Wendig>();
-        //Debug.Log($"[EnemyPresenter_Wendig] EnemyModel_Wendig追加完了");
         status = gameObject.AddComponent<EnemyStatus_Wendig>();
-        //Debug.Log($"[EnemyPresenter_Wendig] EnemyStatus_Wendig追加完了");
-        //Debug.Log($"[EnemyPresenter_Wendig] InitComponents完了");
     }
 
     // フェーズ対応HPバーパーセント計算.

@@ -125,11 +125,6 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 5036a029ccc51bc47bc4a3327cb2d02d
-    m_Address: FirstAttackCollider
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 596d6ae5645b20047872c4ab0ac3c15f
     m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8\u306E\u30CF\u30FC\u30C8\uFF08175\u4EE5\u4E0A\uFF09_260113.png"
     m_ReadOnly: 0
@@ -297,11 +292,6 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b9e533ef4f5cf814ea6bc0110588dcec
     m_Address: "Assets/Main/UI/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8/\u5FC3\u62CD\u6570\u30B2\u30FC\u30B8\uFF08\u53C2\u7167\u7528\uFF09_260113.png"
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: bbd62467a85075940965ea86bede9b81
-    m_Address: GameOverView
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
