@@ -101,8 +101,7 @@ namespace InGame.Player
             try
             {
                 await UniTask.WhenAll(
-                    InstantiateView("PlayerView"),
-                    InstantiateGameOverView("GameOverView")
+                    InstantiateView("PlayerView")
                 );
             }
             catch (System.Exception e)
