@@ -150,7 +150,6 @@ namespace InGame.Player
             breathPointPercent.text = num.ToString();
         }
 
-        //リアクティブ系の方がよさそうだなステータス数値。
         public void SetHealPointCount(int num)
         {
             int _count=0;

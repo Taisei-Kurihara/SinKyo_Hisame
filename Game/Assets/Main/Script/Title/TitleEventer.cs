@@ -42,9 +42,9 @@ namespace SceneEventer
         {
             buttons = new Button[][]
             {
-                    new Button[]{gameStart},
+                    //new Button[]{gameStart},
                     new Button[]{newGame},
-                    new Button[]{setting},
+                    //new Button[]{setting},
                     new Button[]{QuitGame}
             };
         }

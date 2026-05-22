@@ -209,6 +209,14 @@ namespace InGame.Player
         }
 
         /// <summary>
+        /// プレイヤー操作の有効/無効を切り替え（外部から呼び出し用）.
+        /// </summary>
+        public void SetPlayerEnable(bool able)
+        {
+            playerPresenter?.SetPlayerEnable(able);
+        }
+
+        /// <summary>
         /// 外部からダメージを受ける（Enemy等から呼び出し用）.
         /// </summary>
         /// <param name="damageData">ダメージデータ.</param>

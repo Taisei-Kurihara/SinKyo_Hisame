@@ -179,6 +179,15 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
                 return;
             }
 
+            // Addressableキーの存在チェック（InvalidKeyExceptionのログ出力を回避）.
+            var locHandle = UnityEngine.AddressableAssets.Addressables.LoadResourceLocationsAsync("EnemyOffScreenIndicator");
+            var locations = await locHandle;
+            UnityEngine.AddressableAssets.Addressables.Release(locHandle);
+            if (locations == null || locations.Count == 0)
+            {
+                return;
+            }
+
             var handle = UnityEngine.AddressableAssets.Addressables.LoadAssetAsync<GameObject>("EnemyOffScreenIndicator");
             GameObject prefab = await handle;
 

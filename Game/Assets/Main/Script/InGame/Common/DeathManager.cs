@@ -2,7 +2,12 @@ using Common;
 using Cysharp.Threading.Tasks;
 using InGame.Enemy;
 using InGame.Player;
+using InGame.Player.Animation;
+using R3;
 using SceneInfo;
+using System;
+using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace InGame.Common
@@ -47,6 +52,77 @@ namespace InGame.Common
         // プレイヤー歩行速度（速度判定用）.
         private const float playerWalkSpeed = 7f;
 
+        // HP監視サブスクリプション.
+        private IDisposable playerHpSubscription;
+        private List<IDisposable> enemyHpSubscriptions = new List<IDisposable>();
+
+        // ---- HP監視（旧DeathConditionの機能を統合） ----
+
+        /// <summary>
+        /// プレイヤーHPを監視し、HP <= 0 で敗北演出を開始する.
+        /// </summary>
+        public void MonitorPlayerHP(ReactiveProperty<int> playerHp)
+        {
+            playerHpSubscription?.Dispose();
+            playerHpSubscription = playerHp
+                .Where(hp => hp <= 0)
+                .Take(1)
+                .Subscribe(_ =>
+                {
+                    Debug.Log("[DeathManager] プレイヤーHP <= 0 検知");
+                    NotifyPlayerDeath().Forget();
+                });
+        }
+
+        /// <summary>
+        /// EnemyのHPを監視し、HP <= 0 で勝利演出を開始する.
+        /// </summary>
+        public void MonitorEnemyHP(ReactiveProperty<float> enemyHp)
+        {
+            var subscription = enemyHp
+                .Where(hp => hp <= 0)
+                .Take(1)
+                .Subscribe(_ =>
+                {
+                    Debug.Log("[DeathManager] EnemyHP <= 0 検知");
+                    NotifyEnemyDeath().Forget();
+                });
+            enemyHpSubscriptions.Add(subscription);
+        }
+
+        /// <summary>
+        /// SceneChangeStand互換のゲーム終了条件を生成する.
+        /// </summary>
+        public IGameEndCondition CreateGameEndCondition()
+        {
+            return new DeathGameEndCondition();
+        }
+
+        /// <summary>
+        /// SceneChangeStand互換のゲーム終了条件.
+        /// DeathManagerのIsGameEnd状態を監視する.
+        /// </summary>
+        private class DeathGameEndCondition : IGameEndCondition
+        {
+            public async UniTask<bool> WaitForConditionAsync(CancellationToken token)
+            {
+                try
+                {
+                    while (!Instance.IsGameEnd)
+                    {
+                        await UniTask.Yield(cancellationToken: token);
+                    }
+                    return true;
+                }
+                catch (OperationCanceledException)
+                {
+                    return false;
+                }
+            }
+
+            public void Dispose() { }
+        }
+
         // ---- 登録 ----
 
         // EnemyDeathHandlerを登録.
@@ -80,6 +156,10 @@ namespace InGame.Common
 
             StopAllEnemyAI();
 
+            // プレイヤー操作を無効化.
+            var playerScope = UnityEngine.Object.FindFirstObjectByType<PlayerScope>();
+            if (playerScope != null) playerScope.SetPlayerEnable(false);
+
             var playerView = UnityEngine.Object.FindFirstObjectByType<PlayerView>();
             var cam = CameraManager.Instance();
             float originalFollowSpeed = cam.GetFollowSpeed();
@@ -92,11 +172,23 @@ namespace InGame.Common
                 ? (mainCam.orthographic ? mainCam.orthographicSize : mainCam.fieldOfView)
                 : 60f;
 
-            // === Step1: timeScale=0 + FullscreenBlackEffect ON + statusUI.alpha=0 ===.
+            // === Step1: timeScale=0 + FullscreenBlackEffect ON + UI非表示 ===.
             Time.timeScale = 0f;
             FullscreenBlackEffectFeature.IsEnabled = true;
             FullscreenBlackEffectFeature.Blend = 1f;
             if (playerView != null) playerView.SetStatusUIAlpha(0f);
+
+            // Enemy UI非表示.
+            var enemyUISetters = UnityEngine.Object.FindObjectsByType<EnemyUI_View_Setter>(FindObjectsSortMode.None);
+            foreach (var setter in enemyUISetters)
+            {
+                if (setter != null) setter.gameObject.SetActive(false);
+            }
+            var offScreenIndicators = UnityEngine.Object.FindObjectsByType<EnemyOffScreenIndicator>(FindObjectsSortMode.None);
+            foreach (var indicator in offScreenIndicators)
+            {
+                if (indicator != null) indicator.gameObject.SetActive(false);
+            }
 
             // === Step1.5: 完全黒のまま1sec待機 (realtime) ===.
             float startTime = Time.realtimeSinceStartup;
@@ -113,14 +205,20 @@ namespace InGame.Common
             {
                 float t = Mathf.Clamp01((Time.realtimeSinceStartup - startTime) / duration);
                 FullscreenBlackEffectFeature.Blend = 1f - t;
-                if (playerView != null) playerView.SetStatusUIAlpha(t);
+                //if (playerView != null) playerView.SetStatusUIAlpha(t);
                 await UniTask.Yield();
             }
             FullscreenBlackEffectFeature.IsEnabled = false;
             FullscreenBlackEffectFeature.Blend = 0f;
-            if (playerView != null) playerView.SetStatusUIAlpha(1f);
+            //if (playerView != null) playerView.SetStatusUIAlpha(1f);
 
-            // === Step3: Enemy中心にズーム (timeScale=0のまま / speed=0.5 → 約2s) ===.
+            // === Step3: timeScale=1 + 納刀アニメーション + player中心にズーム ===.
+            Time.timeScale = 1f;
+            cam.UseUnscaledTime = false;
+
+            var playerAnim = UnityEngine.Object.FindFirstObjectByType<PlayerAnimationController>();
+            if (playerAnim != null) playerAnim.PlayTrigger("sheathing_of_sword");
+
             if (enemyTransform != null)
             {
                 cam.SetFollowTarget(enemyTransform);
@@ -131,44 +229,13 @@ namespace InGame.Common
                 : 30f;
             await cam.ZoomTo(zoomTarget, 0.5f);
 
-            // === Step3.5: ズーム完了後Enemyを見せる待機 (1.0s realtime) ===.
-            startTime = Time.realtimeSinceStartup;
-            while (Time.realtimeSinceStartup - startTime < 1f)
-            {
-                await UniTask.Yield();
-            }
+            // ズーム完了後: 納刀アニメーション2.
+            if (playerAnim != null) playerAnim.PlayTrigger("sheathing_of_sword_2");
 
-            // === Step4: プレイヤー中心にカメラ移動 (timeScale=0のまま / 1.5s realtime) ===.
-            if (playerTransform != null)
-            {
-                cam.SetFollowTarget(playerTransform);
-                cam.SetFollowSpeed(3f);
-            }
-            startTime = Time.realtimeSinceStartup;
-            while (Time.realtimeSinceStartup - startTime < 1.5f)
-            {
-                await UniTask.Yield();
-            }
 
-            // === Step5: ズームリセット + timeScale 0→1 (1.0s realtime) ===.
-            var zoomTask = cam.ZoomTo(originalZoom, 1f);
-            startTime = Time.realtimeSinceStartup;
-            duration = 1f;
-            while (Time.realtimeSinceStartup - startTime < duration)
-            {
-                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startTime) / duration);
-                Time.timeScale = t;
-                await UniTask.Yield();
-            }
-            Time.timeScale = 1f;
-            await zoomTask;
-            cam.UseUnscaledTime = false;
-            cam.SetFollowSpeed(originalFollowSpeed);
 
-            // === Step6: Win.alpha → 1 (0.5s) + Step7: 3sec待機 (or 3回入力でスキップ) ===.
+            // === Step5: Win.alpha → 1 (0.5s realtime) ===.
             skipInputCount = 0;
-
-            // Win alpha フェードイン (0.5s).
             startTime = Time.realtimeSinceStartup;
             duration = 0.5f;
             while (Time.realtimeSinceStartup - startTime < duration)
@@ -180,6 +247,15 @@ namespace InGame.Common
                 await UniTask.Yield();
             }
             if (playerView != null) playerView.SetWinAlpha(1f);
+
+            // === Step5.5: Win表示後 3sec待機 (realtime / 入力スキップ可能) ===.
+            startTime = Time.realtimeSinceStartup;  
+            while (Time.realtimeSinceStartup - startTime < 3f)
+            {
+                if (CheckAnyInputDown()) skipInputCount++;
+                if (skipInputCount >= 3) { TransitionToTitle(); return; }
+                await UniTask.Yield();
+            }
 
             // GameOverView表示.
             var gameOverView = UnityEngine.Object.FindFirstObjectByType<GameOverView>();
@@ -289,6 +365,10 @@ namespace InGame.Common
             if (cam != null) cam.UseUnscaledTime = false;
 
             Debug.Log("[DeathManager] シーン遷移開始");
+
+            // シングルトン破棄（次回ゲーム開始時に新規インスタンス生成）.
+            DisposeInstance();
+
             SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
         }
 
@@ -320,6 +400,13 @@ namespace InGame.Common
             playerDeathHandler?.Reset();
             enemyDeathHandler = null;
             playerDeathHandler = null;
+
+            // HP監視サブスクリプション破棄.
+            playerHpSubscription?.Dispose();
+            playerHpSubscription = null;
+            foreach (var sub in enemyHpSubscriptions) sub?.Dispose();
+            enemyHpSubscriptions.Clear();
+
             Debug.Log("[DeathManager] リセット");
         }
 
