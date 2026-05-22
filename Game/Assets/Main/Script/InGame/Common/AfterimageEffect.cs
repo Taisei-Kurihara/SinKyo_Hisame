@@ -10,13 +10,13 @@ public class AfterimageEffect : MonoBehaviour
 {
     [Header("残像設定")]
     [Tooltip("最大残像数")]
-    [SerializeField] private int maxAfterimages = 5;
+    [SerializeField] private int maxAfterimages = 30;
 
     [Tooltip("残像の生成間隔（秒）")]
-    [SerializeField] private float spawnInterval = 0.04f;
+    [SerializeField] private float spawnInterval = 0.006f;
 
     [Tooltip("残像のフェード持続時間（秒）")]
-    [SerializeField] private float fadeDuration = 0.3f;
+    [SerializeField] private float fadeDuration = 0.5f;
 
     [Tooltip("残像の色")]
     [SerializeField] private Color afterimageColor = new Color(0.5f, 0.7f, 1f, 0.6f);
@@ -32,6 +32,9 @@ public class AfterimageEffect : MonoBehaviour
     private SpriteRenderer sourceSpriteRenderer;
     private bool isEffectActive = false;
     private float spawnTimer = 0f;
+
+    // ソースから取得したマテリアルキャッシュ.
+    private Material cachedMaterial;
 
     private class AfterimageInstance
     {
@@ -54,13 +57,29 @@ public class AfterimageEffect : MonoBehaviour
     private SpriteRenderer FindValidSpriteRenderer()
     {
         var renderers = GetComponentsInChildren<SpriteRenderer>(true);
-        // スプライトが設定されているものを優先.
         foreach (var sr in renderers)
         {
             if (sr.sprite != null) return sr;
         }
-        // なければ最初のものを返す.
         return renderers.Length > 0 ? renderers[0] : null;
+    }
+
+    /// <summary>
+    /// 残像用マテリアルをキャッシュする.
+    /// Resources/AfterimageUnlit (URP Sprite-Unlit-Default) を優先.
+    /// 見つからない場合はソースのマテリアルを使用.
+    /// </summary>
+    private void CacheMaterial()
+    {
+        if (cachedMaterial != null) return;
+
+        // URP Unlitマテリアルを Resources から読み込み（ビルドでも確実に動作）.
+        cachedMaterial = Resources.Load<Material>("AfterimageUnlit");
+        if (cachedMaterial != null) return;
+
+        // フォールバック: ソースのマテリアルを使用.
+        if (sourceSpriteRenderer == null) return;
+        cachedMaterial = sourceSpriteRenderer.sharedMaterial;
     }
 
     /// <summary>
@@ -114,10 +133,9 @@ public class AfterimageEffect : MonoBehaviour
         }
         if (sourceSpriteRenderer == null)
         {
-            Debug.LogWarning($"[AfterimageEffect] SpriteRenderer が見つかりません: {gameObject.name}");
             return;
         }
-        Debug.Log($"[AfterimageEffect] StartEffect - source: {sourceSpriteRenderer.gameObject.name}");
+        CacheMaterial();
         isEffectActive = true;
         spawnTimer = 0f;
     }
@@ -128,15 +146,10 @@ public class AfterimageEffect : MonoBehaviour
     public void StopEffect()
     {
         isEffectActive = false;
-        // パラメータをデフォルトに戻す.
-        scaleMultiplier = 1f;
-        fadeDuration = 0.3f;
-        spawnInterval = 0.04f;
     }
 
     private void Update()
     {
-        // 残像生成.
         if (isEffectActive && sourceSpriteRenderer != null)
         {
             spawnTimer += Time.deltaTime;
@@ -147,7 +160,6 @@ public class AfterimageEffect : MonoBehaviour
             }
         }
 
-        // 残像更新.
         for (int i = pool.Count - 1; i >= 0; i--)
         {
             var instance = pool[i];
@@ -158,13 +170,11 @@ public class AfterimageEffect : MonoBehaviour
 
             if (t >= 1f)
             {
-                // フェード完了 → 非表示.
                 instance.active = false;
                 instance.gameObject.SetActive(false);
             }
             else
             {
-                // アルファフェード.
                 Color c = instance.startColor;
                 c.a = Mathf.Lerp(instance.startColor.a, 0f, t);
                 instance.spriteRenderer.color = c;
@@ -174,7 +184,12 @@ public class AfterimageEffect : MonoBehaviour
 
     private void SpawnAfterimage()
     {
-        // プールから非アクティブなインスタンスを取得、なければ新規作成.
+        if (sourceSpriteRenderer == null || sourceSpriteRenderer.sprite == null)
+        {
+            sourceSpriteRenderer = FindValidSpriteRenderer();
+            if (sourceSpriteRenderer == null || sourceSpriteRenderer.sprite == null) return;
+        }
+
         AfterimageInstance instance = null;
         foreach (var item in pool)
         {
@@ -187,10 +202,8 @@ public class AfterimageEffect : MonoBehaviour
 
         if (instance == null)
         {
-            // プール上限チェック.
             if (pool.Count >= maxAfterimages)
             {
-                // 最も古いアクティブなものを再利用.
                 instance = pool[0];
             }
             else
@@ -200,22 +213,28 @@ public class AfterimageEffect : MonoBehaviour
             }
         }
 
-        // 残像の設定.
         instance.gameObject.SetActive(true);
         instance.active = true;
         instance.elapsed = 0f;
         instance.fadeDuration = fadeDuration;
         instance.startColor = afterimageColor;
 
-        // スプライト情報をコピー.
         instance.spriteRenderer.sprite = sourceSpriteRenderer.sprite;
-        instance.spriteRenderer.color = afterimageColor;
         instance.spriteRenderer.flipX = sourceSpriteRenderer.flipX;
         instance.spriteRenderer.flipY = sourceSpriteRenderer.flipY;
         instance.spriteRenderer.sortingLayerID = sourceSpriteRenderer.sortingLayerID;
         instance.spriteRenderer.sortingOrder = sourceSpriteRenderer.sortingOrder + sortingOrderOffset;
+        instance.spriteRenderer.color = afterimageColor;
 
-        // 位置・回転・スケールをコピー（スケール倍率を適用）.
+        // ソースと同じマテリアルを適用.
+        if (cachedMaterial != null)
+        {
+            instance.spriteRenderer.sharedMaterial = cachedMaterial;
+        }
+
+        // レイヤーをオーナーに合わせる.
+        instance.gameObject.layer = gameObject.layer;
+
         instance.gameObject.transform.position = sourceSpriteRenderer.transform.position;
         instance.gameObject.transform.rotation = sourceSpriteRenderer.transform.rotation;
         instance.gameObject.transform.localScale = sourceSpriteRenderer.transform.lossyScale * scaleMultiplier;
@@ -225,8 +244,6 @@ public class AfterimageEffect : MonoBehaviour
     {
         var go = new GameObject("Afterimage");
         var sr = go.AddComponent<SpriteRenderer>();
-        sr.material = new Material(sourceSpriteRenderer.sharedMaterial);
-
         return new AfterimageInstance
         {
             gameObject = go,
@@ -237,7 +254,6 @@ public class AfterimageEffect : MonoBehaviour
 
     private void OnDestroy()
     {
-        // プールを破棄.
         foreach (var instance in pool)
         {
             if (instance.gameObject != null)

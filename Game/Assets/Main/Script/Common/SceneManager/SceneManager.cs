@@ -81,6 +81,10 @@ namespace Common
                 {
                     Debug.Log("シーンロードキャンセル");
                 }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[SceneManager] シーンロード失敗: {mainSceneInfo.SceneName} | {e.Message}");
+                }
                 finally
                 {
                     //メインシーンインスタンス更新

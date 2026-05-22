@@ -167,8 +167,12 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         afterimageEffect.SetSpawnInterval(0.015f);
         afterimageEffect.StartEffect();
 
-        // 逆端まで突進.
-        while (ownerTransform != null && Mathf.Abs(ownerTransform.position.x - oppositeEdgeX) > 0.5f)
+        // 逆端まで突進（時間ベースで制御 — フレームレート非依存）.
+        float rushDistance = Mathf.Abs(oppositeEdgeX - ownerTransform.position.x);
+        float rushDuration = rushDistance / effectiveRushSpeed;
+        float rushElapsed = 0f;
+
+        while (ownerTransform != null && rushElapsed < rushDuration)
         {
             if (!EnemNullSafetyHelper.IsValid(enemyModel))
             {
@@ -180,6 +184,7 @@ public class EnemState_Wendig_Rush : EnemState_abstract
                 return;
             }
             rb.linearVelocity = new Vector2(oppositeDirectionX * effectiveRushSpeed, rb.linearVelocity.y);
+            rushElapsed += Time.deltaTime;
             await UniTask.Yield();
         }
 

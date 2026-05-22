@@ -13,6 +13,10 @@ public abstract class EnemState_abstract
     // OnAfterPostAction は常に実行される（クリーンアップ保証）.
     protected bool isAborted = false;
 
+    // trueの場合、Act()終了時のIdol状態復帰（Move=0）をスキップする.
+    // 独自のアニメーション遷移を管理するState向け.
+    protected bool skipPostIdolTransition = false;
+
     // Template Method（子クラスでoverrideしない）.
     public async UniTask Act(EnemyModel_abstract enemyModel)
     {
@@ -36,10 +40,20 @@ public abstract class EnemState_abstract
         // 5. 行動後待機後の処理（常に実行 — クリーンアップ保証）.
         await OnAfterPostAction(enemyModel);
 
-        // Idol状態に復帰.
-        if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
+        // Idol状態に復帰（skipPostIdolTransition=trueの場合はスキップ）.
+        // 空中状態（IsJumping）ではIdol遷移をスキップ（ジャンプアニメーションを上書きしないため）.
+        if (!skipPostIdolTransition && EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
-            enemyModel.Animator.SetInteger("Move", 0);
+            if (!enemyModel.IsJumping)
+            {
+                enemyModel.Animator.SetInteger("Move", 0);
+            }
+        }
+
+        // 安全策: Act終了時にIsJumpingフラグをリセット（前のStateで未クリアの場合の対策）.
+        if (enemyModel != null)
+        {
+            enemyModel.IsJumping = false;
         }
     }
 

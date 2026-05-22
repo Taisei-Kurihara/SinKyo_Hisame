@@ -112,9 +112,16 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         colliderState.ClearHitTargets();
         colliderState.SetDamage(jumpSlashDamage);
 
-        // アニメーション: "Jump"トリガー.
+        // ジャンプ中はMove=2でIdol/Walk遷移をブロック.
+        animator.SetInteger("Move", 2);
         animator.ResetTrigger("EndJump");
-        animator.SetTrigger("Jump");
+        animator.ResetTrigger("Attack");
+        animator.ResetTrigger("Attack_End");
+        // ジャンプアニメーション開始（triggerで遷移）.
+        animator.SetTrigger("Jamp");
+        // 明示的に空中状態に遷移させる.
+        animator.SetBool("OnGround", false);
+        enemyModel.IsJumping = true;
 
         // 攻撃通告: パリィ不可.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
@@ -127,8 +134,6 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         {
             mainColl.isTrigger = true;
         }
-        // FixedUpdateのPlatform落下制御をスキップ（isTrigger中でも安全にジャンプする）.
-        enemyModel.IsJumping = true;
         stateModified = true;
 
         // ジャンプ速度を計算.
@@ -265,6 +270,9 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         {
             Debug.Log("[JumpSlash] EndJump トリガー発火");
             animator.SetTrigger("EndJump");
+            // 着地後はOnGround=true + Move=0でIdol遷移を許可.
+            animator.SetBool("OnGround", true);
+            animator.SetInteger("Move", 0);
         }
 
         // 着地位置をスナップ（isTrigger中は物理衝突しないため手動で地面に合わせる）.
@@ -283,6 +291,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         colliderState.ClearHitTargets();
         colliderState.SetDamage(jumpSlashDamage);
 
+        float colliderPhaseStartTime = Time.time;
         await EnemColliderHelper.ExecuteColliderPhaseUntil(
             enemyModel,
             new EnemColliderHelper.ColliderPhaseConfig
@@ -296,6 +305,8 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             },
             () =>
             {
+                // 安全タイムアウト（2秒）: アニメーション未再生時の無限待機を防止.
+                if (Time.time - colliderPhaseStartTime > 2f) return true;
                 if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) return true;
                 var stateInfo = animator.GetCurrentAnimatorStateInfo(0);
                 // Jumpアニメーションが終了したら終了.
@@ -311,8 +322,10 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
 
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
-            animator.ResetTrigger("Jump");
+            animator.ResetTrigger("Jamp");
             animator.SetTrigger("EndJump");
+            animator.SetBool("OnGround", true);
+            animator.SetInteger("Move", 0);
         }
         await UniTask.CompletedTask;
     }

@@ -841,41 +841,41 @@ namespace InGame.Player
         }
 
         /// <summary>
-        /// Player/Enemy死亡条件をSceneChangeStandに登録.
-        /// HP <= 0 から2.5秒後にタイトルへ戻る.
+        /// Player/Enemy死亡条件をDeathManagerに登録.
+        /// HP <= 0 で勝利/敗北演出を開始する.
         /// </summary>
         private void RegisterPlayerDeathCondition()
         {
             var titleSceneInfo = new TitleSceneInfo();
             var sceneChangeStand = SceneChangeStand.Instance();
 
-            // Player死亡条件登録（死亡通知・シーン遷移はDeathManager経由で実行）.
-            var playerDeathCondition = new DeathCondition(playerStatusModel.hp, 2.5f);
-            sceneChangeStand.RegisterCondition(playerDeathCondition, titleSceneInfo);
+            // DeathManagerにPlayer HP監視を登録.
+            DeathManager.Instance.MonitorPlayerHP(playerStatusModel.hp);
 
-            // Enemy死亡条件登録.
-            RegisterEnemyDeathConditionsAsync(titleSceneInfo).Forget();
+            // SceneChangeStand互換の条件を登録（他の条件とのキャンセル連携用）.
+            sceneChangeStand.RegisterCondition(DeathManager.Instance.CreateGameEndCondition(), titleSceneInfo);
+
+            // Enemy HP監視登録.
+            RegisterEnemyDeathConditionsAsync().Forget();
         }
 
         /// <summary>
-        /// Enemyの死亡条件を非同期で登録.
+        /// EnemyのHP監視をDeathManagerに非同期で登録.
         /// </summary>
-        private async UniTaskVoid RegisterEnemyDeathConditionsAsync(TitleSceneInfo titleSceneInfo)
+        private async UniTaskVoid RegisterEnemyDeathConditionsAsync()
         {
             // Enemyが生成されるまで待機.
             await UniTask.WaitUntil(() => UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>() != null);
 
             var enemies = UnityEngine.Object.FindObjectsByType<EnemyPresenter_abstract>(FindObjectsSortMode.None);
-            var sceneChangeStand = SceneChangeStand.Instance();
 
             foreach (var enemy in enemies)
             {
                 if (enemy.Status != null)
                 {
-                    // Enemy死亡条件登録（死亡通知・シーン遷移はDeathManager経由で実行）.
-                    var enemyDeathCondition = new DeathCondition(enemy.Status.hp, 2.5f);
-                    sceneChangeStand.RegisterCondition(enemyDeathCondition, titleSceneInfo);
-                    Debug.Log($"[PlayerPresenter] Enemy死亡条件登録完了 - {enemy.gameObject.name}");
+                    // DeathManagerにEnemy HP監視を登録.
+                    DeathManager.Instance.MonitorEnemyHP(enemy.Status.hp);
+                    Debug.Log($"[PlayerPresenter] Enemy HP監視登録完了 - {enemy.gameObject.name}");
                 }
             }
         }
