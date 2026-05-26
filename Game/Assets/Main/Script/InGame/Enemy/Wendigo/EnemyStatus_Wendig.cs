@@ -11,9 +11,13 @@ public class EnemyStatus_Wendig : EnemyStatus_abstract
     private EnemyModel_Wendig wendigModel;
 
     // Wendig基礎攻撃力.
-    private float baseAttackPower = 50f;
-    private float enragedAttackPower = 75f;
-    private float enrageHpThreshold = 12500f;
+    private const float defaultBaseAttackPower = 50f;
+    private const float defaultEnragedAttackPower = 75f;
+    private const float defaultEnrageHpThreshold = 12500f;
+
+    private float baseAttackPower = defaultBaseAttackPower;
+    private float enragedAttackPower = defaultEnragedAttackPower;
+    private float enrageHpThreshold = defaultEnrageHpThreshold;
 
     // 現在の攻撃力を取得.
     public float GetCurrentAttackPower()
@@ -38,10 +42,13 @@ public class EnemyStatus_Wendig : EnemyStatus_abstract
             hpMultiplier = 1.5f;
         }
 
-        // Wendig HP設定（全フェーズ合計 = (7500+12500) × 倍率）.
+        // 全ステータスを明示的にリセット.
         maxhp = 20000f * hpMultiplier;
         hp.Value = maxhp;
-        Debug.Log($"[EnemyStatus_Wendig] Init完了 - HP:{maxhp} (倍率:{hpMultiplier})");
+        baseAttackPower = defaultBaseAttackPower;
+        enragedAttackPower = defaultEnragedAttackPower;
+        enrageHpThreshold = defaultEnrageHpThreshold * hpMultiplier;
+        Debug.Log($"[EnemyStatus_Wendig] Init完了 - HP:{maxhp} EnrageThreshold:{enrageHpThreshold} (倍率:{hpMultiplier})");
     }
 
     private void Start()

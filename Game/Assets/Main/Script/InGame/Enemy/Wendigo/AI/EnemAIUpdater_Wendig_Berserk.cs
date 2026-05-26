@@ -69,8 +69,8 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
     public EnemAIUpdater_Wendig_Berserk(EnemAIModel_Wendig_Normal master) : base(master)
     {
-        // Berserk phaseのHP = 12500 → 閾値 = 12500/3 ≈ 4166.
-        InitAngerThreshold(12500f);
+        // Berserk phaseのHP（難易度反映済み）から怒り閾値を計算.
+        InitAngerThreshold(master.GetCurrentPhaseHp());
     }
 
     // --- MasterAIへのショートカット ---
@@ -97,10 +97,23 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
     protected override async UniTask OnUpdateStart(CancellationToken token)
     {
+        // 全内部状態を初期化.
+        currentState = BerserkState.Idle;
         berserkElapsedTime = 0f;
         fatigue = 0f;
         fatigueMaxReached = false;
         fatigueRecoveryTimer = 0f;
+        randomMoveCount = 0;
+        currentActionSetting = null;
+        aiStartTime = Time.time;
+        lastRushEndTime = -100f;
+        pendingAngerHowling = false;
+        meleeAttacksSinceLastRush = 0;
+        lastMeleeAttackType = -1;
+        // 怒りゲージリセット.
+        angerGauge = 0f;
+        isAngry = false;
+        Debug.Log($"[WendigBerserkUpdater] OnUpdateStart - 全状態リセット完了");
 
         // 暴走開始時の演出（Howling）.
         if (ownerModel is EnemyModel_Wendig wendigModel)
@@ -258,7 +271,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
         if (isOffScreen)
         {
             float yDiffForCamera = ownerTransform != null ? TargetPosition.y - ownerTransform.position.y : 0f;
-            if (yDiffForCamera >= 1.5f)
+            if (yDiffForCamera >= 3f)
             {
                 Debug.Log($"[WendigBerserkUpdater] カメラ範囲外だがとびかかり切り条件成立");
             }
@@ -512,7 +525,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
             if (isJumpSlash)
             {
                 float yDiff = TargetPosition.y - ownerTransform.position.y;
-                if (yDiff < 1.5f) continue;
+                if (yDiff < 3f) continue;
             }
 
             if (setting.actionState is EnemState_Wendig_Rush)
@@ -565,7 +578,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
             if (setting.actionState is EnemState_Wendig_JumpSlash)
             {
                 float yDiff = TargetPosition.y - ownerTransform.position.y;
-                if (yDiff < 1.5f) continue;
+                if (yDiff < 3f) continue;
             }
 
             if (setting.actionState is EnemState_Wendig_Rush)
