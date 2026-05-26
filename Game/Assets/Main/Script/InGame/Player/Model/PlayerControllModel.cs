@@ -44,6 +44,14 @@ namespace InGame.Player
             gageEvents.Add((condition, action));
         }
 
+        /// <summary>
+        /// 吸収ゲージを初期化.
+        /// </summary>
+        public void ResetGage()
+        {
+            num.Value = 0;
+        }
+
         public void Increment(int _num)
         {
             if(_num <= 0) return;
@@ -123,6 +131,11 @@ namespace InGame.Player
             hp.Value = maxHp;
             healPoint.Value = healPointMax;
             speed = playerStatusInitModel.speed;
+            strengthRate = 1.0f;
+            speedRate = 1.0f;
+
+            // 鼓動ゲージ初期化.
+            pulseModel.ResetToBase();
         }
 
         PulseModel pulseModel;
@@ -360,6 +373,9 @@ namespace InGame.Player
         public void Initialize()
         {
             status.InitializeStatus();
+
+            // 吸収ゲージ初期化.
+            PlayerManager.Instance().drainModel?.ResetGage();
 
             // 残像エフェクト初期化.
             if (avator != null && afterimageEffect == null)

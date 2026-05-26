@@ -27,6 +27,19 @@ namespace InGame.Player
         // 吸収ゲージモデル.
         public DrainModel drainModel { get; set; }
 
+        // DPS計測用View参照.
+        private IPlayerView dpsView;
+
+        /// <summary>
+        /// DPS計測用ViewをPlayerManager経由で設定.
+        /// </summary>
+        public void SetDPSView(IPlayerView view) => dpsView = view;
+
+        /// <summary>
+        /// 与ダメージをDPS計測に記録.
+        /// </summary>
+        public void RecordDamage(float damage) => dpsView?.RecordDamage(damage);
+
         // Addressable ハンドル保持（解放用）.
         private AsyncOperationHandle<GameObject> characterHandle;
         private GameObject characterInstance;

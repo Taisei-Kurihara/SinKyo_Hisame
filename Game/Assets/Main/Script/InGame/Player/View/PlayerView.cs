@@ -50,6 +50,21 @@ namespace InGame.Player
         [SerializeField] private CanvasGroup statusUI;
         [SerializeField] private CanvasGroup win;
         [SerializeField] private CanvasGroup lose;
+
+        [Header("DPS表示")]
+        [SerializeField] private TextMeshProUGUI dpsText;
+        // DPS計算用ダメージ履歴.
+        private readonly List<(float time, float damage)> damageHistory = new();
+        private const float dpsHistoryMaxSeconds = 5f;
+
+        // InGame中の最高DPS記録.
+        private float maxDps1 = 0f;
+        private float maxDps3 = 0f;
+        private float maxDps5 = 0f;
+
+        // DPS表示の有効状態.
+        private bool isDpsActive = false;
+
         // 心拍数ゲージアニメーション用.
         private float targetHeartFill = 0.25f;
         private float currentHeartFill = 0.25f;
@@ -62,6 +77,15 @@ namespace InGame.Player
         /// 心拍数ゲージ設定.
         /// </summary>
         /// <param name="heartRate">心拍数(0-200).</param>
+        private void Start()
+        {
+            // DPS表示を初期状態で無効化.
+            if (dpsText != null)
+            {
+                dpsText.gameObject.SetActive(false);
+            }
+        }
+
         public void SetHeartGauge(int heartRate)
         {
             // animatorに心拍数を設定.
@@ -142,6 +166,19 @@ namespace InGame.Player
                 currentHeartFill = Mathf.MoveTowards(currentHeartFill, targetHeartFill, maxDelta);
                 heartGage.fillAmount = currentHeartFill;
             }
+
+            // Bキーで DPS表示の有効/無効を切り替え.
+            if (Input.GetKeyDown(KeyCode.B))
+            {
+                isDpsActive = !isDpsActive;
+                if (dpsText != null)
+                {
+                    dpsText.gameObject.SetActive(isDpsActive);
+                }
+            }
+
+            // DPS表示更新.
+            UpdateDPS();
         }
 
         public void SetSkillGauge(float percent)
@@ -222,6 +259,57 @@ namespace InGame.Player
         public void SetLoseAlpha(float alpha)
         {
             if (lose != null) lose.alpha = alpha;
+        }
+
+        // ---- DPS計測 ----
+
+        /// <summary>
+        /// 与ダメージを記録（Presenterから呼び出し）.
+        /// </summary>
+        public void RecordDamage(float damage)
+        {
+            damageHistory.Add((Time.time, damage));
+        }
+
+        /// <summary>
+        /// 指定秒数ウィンドウ内の合計ダメージからDPSを算出.
+        /// </summary>
+        private float CalculateDPS(float windowSeconds)
+        {
+            float cutoff = Time.time - windowSeconds;
+            float total = 0f;
+            for (int i = damageHistory.Count - 1; i >= 0; i--)
+            {
+                if (damageHistory[i].time < cutoff) break;
+                total += damageHistory[i].damage;
+            }
+            return total / windowSeconds;
+        }
+
+        /// <summary>
+        /// 古い履歴を削除し、DPS表示を更新.
+        /// </summary>
+        private void UpdateDPS()
+        {
+            if (dpsText == null || !isDpsActive) return;
+
+            // 5秒より古い履歴を除去.
+            float cutoff = Time.time - dpsHistoryMaxSeconds;
+            while (damageHistory.Count > 0 && damageHistory[0].time < cutoff)
+            {
+                damageHistory.RemoveAt(0);
+            }
+
+            float dps1 = CalculateDPS(1f);
+            float dps3 = CalculateDPS(3f);
+            float dps5 = CalculateDPS(5f);
+
+            // 最高記録を更新.
+            if (dps1 > maxDps1) maxDps1 = dps1;
+            if (dps3 > maxDps3) maxDps3 = dps3;
+            if (dps5 > maxDps5) maxDps5 = dps5;
+
+            dpsText.text = $"DPS_1sec:{dps1:F0}\nDPS_3sec:{dps3:F0}\nDPS_5sec:{dps5:F0}\n\nMaxDPS_1sec:{maxDps1:F0}\nMaxDPS_3sec:{maxDps3:F0}\nMaxDPS_5sec:{maxDps5:F0}";
         }
 
     }

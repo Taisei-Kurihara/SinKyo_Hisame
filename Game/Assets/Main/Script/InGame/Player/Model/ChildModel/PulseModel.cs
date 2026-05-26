@@ -41,9 +41,15 @@ namespace InGame.Player
         public float GetIdleDecreaseMax() => maxIdleDecrease;
 
         /// <summary>
-        /// 鼓動ゲージを基準値(100)にリセット.
+        /// 鼓動ゲージを基準値(100)にリセットし、内部状態を初期化.
         /// </summary>
-        public void ResetToBase() => pulseGauge.Value = basePulseGauge;
+        public void ResetToBase()
+        {
+            pulseGauge.Value = basePulseGauge;
+            currentIdleDecrease = maxIdleDecrease;
+            isDecreaseRecovering = false;
+            decreaseRecoveryTimer = 0f;
+        }
         float rate = 3;
 
         /// <summary>

@@ -223,6 +223,8 @@ namespace InGame.Player
             if (enemyPresenter.Status != null)
             {
                 enemyPresenter.Status.OnDamaged(attackDamage).Forget();
+                // DPS計測に与ダメージを記録.
+                PlayerManager.Instance(false)?.RecordDamage(attackDamage);
             }
         }
     }

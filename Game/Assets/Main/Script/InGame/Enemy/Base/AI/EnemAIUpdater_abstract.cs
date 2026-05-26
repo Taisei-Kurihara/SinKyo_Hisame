@@ -144,65 +144,77 @@ public abstract class EnemAIUpdater_abstract
         var linkedToken = updaterCts.Token;
         IsRunning = true;
 
-        await OnUpdateStart(linkedToken);
-
-        int loopCount = 0;
-        while (!linkedToken.IsCancellationRequested)
+        try
         {
-            if (masterAI.OwnerModel == null || masterAI.OwnerModel.Presenter == null)
+            await OnUpdateStart(linkedToken);
+
+            int loopCount = 0;
+            while (!linkedToken.IsCancellationRequested)
             {
-                Debug.LogWarning($"[EnemAIUpdater] ループ終了 - OwnerModel or Presenter が null (loopCount: {loopCount})");
-                break;
+                if (masterAI.OwnerModel == null || masterAI.OwnerModel.Presenter == null)
+                {
+                    Debug.LogWarning($"[EnemAIUpdater] ループ終了 - OwnerModel or Presenter が null (loopCount: {loopCount})");
+                    break;
+                }
+
+                // 一時停止中はYieldだけして待機.
+                if (isPaused)
+                {
+                    await UniTask.Yield(linkedToken);
+                    continue;
+                }
+
+                // 停止条件チェック.
+                if (stopCondition != null && stopCondition())
+                {
+                    Debug.Log($"[EnemAIUpdater] 停止条件成立 - ループ終了");
+                    break;
+                }
+
+                try
+                {
+                    await OnUpdateLoop(linkedToken);
+                    await UniTask.Yield(linkedToken);
+                    loopCount++;
+                }
+                catch (MissingReferenceException e)
+                {
+                    // Destroyされたオブジェクトへのアクセス → ループ終了.
+                    Debug.LogWarning($"[EnemAIUpdater] Destroyされたオブジェクトアクセス検出 - ループ終了: {e.Message}");
+                    break;
+                }
+                catch (System.Exception e) when (e is not System.OperationCanceledException)
+                {
+                    Debug.LogError($"[EnemAIUpdater] 例外発生: {e.Message}");
+                    if (masterAI == null || masterAI.OwnerModel == null || masterAI.OwnerModel.Presenter == null) break;
+                    throw;
+                }
             }
 
-            // 一時停止中はYieldだけして待機.
-            if (isPaused)
+            // 強制停止でなければOnUpdateEndを実行.
+            if (!linkedToken.IsCancellationRequested)
             {
-                await UniTask.Yield(linkedToken);
-                continue;
-            }
-
-            // 停止条件チェック.
-            if (stopCondition != null && stopCondition())
-            {
-                Debug.Log($"[EnemAIUpdater] 停止条件成立 - ループ終了");
-                break;
-            }
-
-            try
-            {
-                await OnUpdateLoop(linkedToken);
-                await UniTask.Yield(linkedToken);
-                loopCount++;
-            }
-            catch (MissingReferenceException e)
-            {
-                // Destroyされたオブジェクトへのアクセス → ループ終了.
-                Debug.LogWarning($"[EnemAIUpdater] Destroyされたオブジェクトアクセス検出 - ループ終了: {e.Message}");
-                break;
-            }
-            catch (System.Exception e) when (e is not System.OperationCanceledException)
-            {
-                Debug.LogError($"[EnemAIUpdater] 例外発生: {e.Message}");
-                if (masterAI == null || masterAI.OwnerModel == null || masterAI.OwnerModel.Presenter == null) break;
-                throw;
+                await OnUpdateEnd(token);
             }
         }
-
-        // 強制停止でなければOnUpdateEndを実行.
-        if (!linkedToken.IsCancellationRequested)
+        catch (System.OperationCanceledException) when (!token.IsCancellationRequested)
         {
-            await OnUpdateEnd(token);
+            // ForceStop（Updater切り替え）によるキャンセル → 正常終了扱い.
+            // masterのtokenは生きているのでAILoop側でpendingUpdaterに切り替わる.
+            Debug.Log($"[EnemAIUpdater] ForceStopによるUpdater切り替え検出 - {GetType().Name}");
         }
+        // masterのtokenキャンセル時はOCEをそのまま伝播（AI全体停止）.
+        finally
+        {
+            IsRunning = false;
 
-        IsRunning = false;
+            // CTS破棄.
+            updaterCts?.Dispose();
+            updaterCts = null;
 
-        // CTS破棄.
-        updaterCts?.Dispose();
-        updaterCts = null;
-
-        // 停止通知をmasterへ送信.
-        onUpdaterStopped?.Invoke();
+            // 停止通知をmasterへ送信.
+            onUpdaterStopped?.Invoke();
+        }
     }
 
     /// <summary>ループ開始前に1回呼ばれる（子クラスでoverride可能）.</summary>

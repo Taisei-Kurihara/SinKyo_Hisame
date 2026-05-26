@@ -22,5 +22,10 @@ namespace InGame.Player
         void SetDrainGages(float percent);
 
         void SetDrainUIGenerat(int num);
+
+        /// <summary>
+        /// 与ダメージをDPS計測に記録.
+        /// </summary>
+        void RecordDamage(float damage);
     }
 }

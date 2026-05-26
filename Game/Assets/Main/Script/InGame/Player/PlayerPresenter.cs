@@ -579,6 +579,8 @@ namespace InGame.Player
         public void GetView(IPlayerView _view)
         {
             this.view = _view;
+            // DPS計測用にPlayerManagerにもView登録.
+            PlayerManager.Instance(false)?.SetDPSView(_view);
         }
 
         /// <summary>

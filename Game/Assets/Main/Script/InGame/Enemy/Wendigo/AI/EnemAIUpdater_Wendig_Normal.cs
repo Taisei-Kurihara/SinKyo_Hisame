@@ -59,6 +59,32 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
         InitAngerThreshold(master.GetCurrentPhaseHp());
     }
 
+    // === 状態の明示的リセット ===
+
+    protected override async UniTask OnUpdateStart(CancellationToken token)
+    {
+        // 全内部状態を初期化.
+        currentState = UpdaterState.Idle;
+        randomMoveCount = 0;
+        currentActionSetting = null;
+        aiStartTime = Time.time;
+        lastRushEndTime = -100f;
+        pendingAngerHowling = false;
+        meleeAttacksSinceLastRush = 0;
+        lastMeleeAttackType = -1;
+        // 怒りゲージリセット.
+        angerGauge = 0f;
+        isAngry = false;
+        // 速度修正リセット.
+        currentSpeedModifier = WendigSpeedModifier.Default;
+        if (masterAI.OwnerModel?.Animator != null)
+        {
+            masterAI.OwnerModel.Animator.speed = 1f;
+        }
+        Debug.Log($"[WendigNormalUpdater] OnUpdateStart - 全状態リセット完了");
+        await UniTask.CompletedTask;
+    }
+
     // --- MasterAIへのショートカット ---
     private EnemyModel_abstract ownerModel => masterAI.OwnerModel;
     private Transform ownerTransform => masterAI.OwnerTransform;
@@ -149,7 +175,7 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
         if (isOffScreen)
         {
             float yDiffForCamera = ownerTransform != null ? TargetPosition.y - ownerTransform.position.y : 0f;
-            if (yDiffForCamera >= 1.5f)
+            if (yDiffForCamera >= 3f)
             {
                 Debug.Log($"[WendigNormalUpdater] カメラ範囲外だがとびかかり切り条件成立 - カメラ内移動スキップ");
             }
@@ -403,7 +429,7 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
             if (isJumpSlash)
             {
                 float yDiff = TargetPosition.y - ownerTransform.position.y;
-                if (yDiff < 1.5f) continue;
+                if (yDiff < 3f) continue;
             }
 
             if (setting.actionState is EnemState_Wendig_Rush)
@@ -456,7 +482,7 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
             if (setting.actionState is EnemState_Wendig_JumpSlash)
             {
                 float yDiff = TargetPosition.y - ownerTransform.position.y;
-                if (yDiff < 1.5f) continue;
+                if (yDiff < 3f) continue;
             }
 
             if (setting.actionState is EnemState_Wendig_Rush)
