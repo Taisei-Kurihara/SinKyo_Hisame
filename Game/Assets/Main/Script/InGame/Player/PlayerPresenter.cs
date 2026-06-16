@@ -5,6 +5,7 @@ using System;
 using Cysharp.Threading.Tasks;
 using R3;
 using SceneInfo;
+using InGame;
 using InGame.Player;
 using InGame.Player.Animation;
 using InGame.Common;
@@ -56,6 +57,7 @@ namespace InGame.Player
 
         // HeartResist状態.
         private bool isHeartResisting = false;
+        private bool isStrongHeartResist = false;
         private float heartResistCooldownEnd = 0f;
         private const float heartResistCooldown = 0.825f;
         private float heartResistStartTime = 0f;
@@ -69,8 +71,14 @@ namespace InGame.Player
         private bool isPulseMaxStunning = false;
         private bool stunInterruptedByDamage = false;
 
-        // ガード/パリィSE用.
+        // SE用.
         private SEPlayer guardSEPlayer;
+
+        // 回避居合い設定.
+        private float iaiDodgeDistance = 5f;    // 距離条件.
+        private float iaiDodgeAngle = 180f;     // 方向条件（±度、初期値は全方向有効）.
+        private const float iaiDodgeTimeWindow = 0.5f; // タイミング判定窓（秒）.
+        private const float iaiDodgeInvincibilityExtension = 0.5f; // パリィ不可攻撃時の無敵延長（秒）.
 
         // ゲームオーバー画面.
         private GameOverView gameOverView;
@@ -287,14 +295,21 @@ namespace InGame.Player
             if (playerModel.enableAction == false && !isPulseMaxStunning)
             {
 
-                // 移動 - 居合中は全操作無視、HeartResist中は0.2→2secかけて0.33へ.
+                // 移動 - 居合中は全操作無視、HeartResist中は弱:0.2→0.5 ramp / 強:×0.01.
                 Vector2 moveInput = isIaiActive ? Vector2.zero : inputActions.CharacterController.Move.ReadValue<Vector2>();
                 if (isHeartResisting)
                 {
-                    float elapsed = UnityEngine.Time.time - heartResistStartTime;
-                    float t = Mathf.Clamp01(elapsed / 2.0f);
-                    float speedMult = Mathf.Lerp(0.2f, 0.5f, t);
-                    moveInput *= speedMult;
+                    if (isStrongHeartResist)
+                    {
+                        moveInput *= 0.01f;
+                    }
+                    else
+                    {
+                        float elapsed = UnityEngine.Time.time - heartResistStartTime;
+                        float t = Mathf.Clamp01(elapsed / 2.0f);
+                        float speedMult = Mathf.Lerp(0.2f, 0.5f, t);
+                        moveInput *= speedMult;
+                    }
                 }
                 playerModel.OnMove(moveInput);
                 // 入力方向をアニメーションコントローラーに通知（攻撃中は呼ばれないため反動反転を防止）.
@@ -312,11 +327,20 @@ namespace InGame.Player
                 { EndJakComboIfActive(); ExecuteMeleeAttackAsync("RestrainAttack").Forget(); }
 
                 // 操作が統一されているものの為、判定を書いていく.
-                // 回避.
+                // 回避（回避居合い判定付き）.
                 if (inputActions.CharacterController.Dodge.WasPressedThisFrame())
                 {
                     EndJakComboIfActive();
-                    playerModel.OnDodge(inputActions.CharacterController.Move.ReadValue<Vector2>());
+                    Vector2 dodgeDir = inputActions.CharacterController.Move.ReadValue<Vector2>();
+                    var dodgeIaiResult = CheckDodgeIaiCondition(dodgeDir);
+                    if (dodgeIaiResult.shouldTriggerIai)
+                    {
+                        ExecuteDodgeIaiAsync(dodgeDir, dodgeIaiResult.enemy, dodgeIaiResult.isParryable).Forget();
+                    }
+                    else
+                    {
+                        playerModel.OnDodge(dodgeDir);
+                    }
                 }
                 // 回復.
                 if (inputActions.CharacterController.Heal.WasPressedThisFrame())
@@ -355,21 +379,16 @@ namespace InGame.Player
                 //    playerSearchModel.SearchStageSelect();
                 //}
 
-                if (inputActions.CharacterController.Guard.WasPressedThisFrame())
-                {
-                    EndJakComboIfActive();
-                    //Debug.Log("[PlayerPresenter] Guard Start");
-                    guard.GuardStart();
-                    playerAnimation?.SetGuard(true);
-                    playerModel.SetGuarding(true);
-                }
                 } // 居合中操作無視ブロック終了.
             }
 
             // HeartResist開始 (スタン中・居合中・クールダウン中は受け付けない).
+            // HeartResist(RB/L) または Guard(LB/O=強) のどちらかで開始.
             if (!isPulseMaxStunning && !isIaiActive && !playerModel.enableAction
                 && UnityEngine.Time.time >= heartResistCooldownEnd
-                && inputActions.CharacterController.HeartResist.WasPressedThisFrame())
+                && !isHeartResisting
+                && (inputActions.CharacterController.HeartResist.WasPressedThisFrame()
+                    || inputActions.CharacterController.Guard.WasPressedThisFrame()))
             {
                 isHeartResisting = true;
                 heartResistStartTime = UnityEngine.Time.time;
@@ -378,10 +397,18 @@ namespace InGame.Player
             }
 
             // HeartResist実行中 - 鼓動減少 (スタン中・居合中は停止).
-            if (!isPulseMaxStunning && !playerModel.enableAction && inputActions.CharacterController.HeartResist.IsPressed() && isHeartResisting)
+            // RB+LB同時押しなら「強」、片方のみなら「弱」.
+            if (!isPulseMaxStunning && !playerModel.enableAction && isHeartResisting
+                && (inputActions.CharacterController.HeartResist.IsPressed()
+                    || inputActions.CharacterController.Guard.IsPressed()))
             {
+                bool isStrong = inputActions.CharacterController.HeartResist.IsPressed()
+                             && inputActions.CharacterController.Guard.IsPressed();
+
                 // 鼓動100越えの時は秒間10減少、それ以外は秒間5減少.
                 float decreaseRate = pulseModel.GetPulseGauge() > 100f ? 10f : 5f;
+                // 強は3倍.
+                if (isStrong) decreaseRate *= 3f;
                 // 0.2から2秒かけて本来の減少量に到達.
                 float elapsedHR = UnityEngine.Time.time - heartResistStartTime;
                 float tHR = Mathf.Clamp01(elapsedHR / 2.0f);
@@ -391,12 +418,17 @@ namespace InGame.Player
 
                 // 心拍数減少時の攻撃力バフ: 減少量に応じてstrengthRateを上昇（1.75倍係数）.
                 playerStatusModel.strengthRate += decreaseAmount * 0.01f * 1.75f;
+
+                isStrongHeartResist = isStrong;
             }
 
-            // HeartResist終了.
-            if (inputActions.CharacterController.HeartResist.WasReleasedThisFrame() && isHeartResisting)
+            // HeartResist終了（両方離されたとき）.
+            if (isHeartResisting
+                && !inputActions.CharacterController.HeartResist.IsPressed()
+                && !inputActions.CharacterController.Guard.IsPressed())
             {
                 isHeartResisting = false;
+                isStrongHeartResist = false;
                 heartResistCooldownEnd = UnityEngine.Time.time + heartResistCooldown;
                 if (pulseModel.GetPulseGauge() < 100f)
                 {
@@ -410,13 +442,6 @@ namespace InGame.Player
                     playerAnimation?.PlayTrigger("hearEnd");
                     Debug.Log("[PlayerPresenter] HeartResist End - hearEnd trigger (pulse >= 100)");
                 }
-            }
-
-            if (inputActions.CharacterController.Guard.WasReleasedThisFrame())
-            {
-                guard.GuardEnd();
-                playerAnimation?.SetGuard(false);
-                playerModel.SetGuarding(false);
             }
         }
 
@@ -441,50 +466,13 @@ namespace InGame.Player
 
             GuardState state = GuardState.None;
             int damage = damageData.Damage;
-            int attackPowerlevel = damageData.Powerlevel;
             bool canKnockback = true;
-
-            // ガード中の場合.
-            if (guard != null && guard.IsGuarding)
-            {
-                state = guard.CurrentGuardState;
-
-                // パリィ成功時: 吸収ゲージポイント25付与.
-                if (state == GuardState.Parry)
-                {
-                    drainModel?.Increment(25);
-                }
-
-                // Powerlevelで上回られた場合は強制防御解除 + ダメージ3割軽減.
-                if (guard.IsOverpowered(attackPowerlevel))
-                {
-                    damage = (int)(damage * 0.7f);
-                    ForceGuardEnd();
-                    Debug.Log($"[PlayerPresenter] Powerlevel上回られ - 強制防御解除 + ダメージ3割軽減: {damage} (攻撃:{attackPowerlevel} > ガード:{guard.GetGuardPowerlevel()})");
-                }
-                else if (state == GuardState.Parry)
-                {
-                    // パリィ成功時: ダメージ0、ノックバックなし、居合発動.
-                    damage = 0;
-                    canKnockback = false;
-                    ForceGuardEnd();
-                    ExecuteIaiAttackAsync().Forget();
-                    // パリィ成功SE再生.
-                    guardSEPlayer?.Play("SE_Parry");
-                    Debug.Log($"[PlayerPresenter] Parry成功 - ダメージ無効化、居合発動");
-                }
-                else
-                {
-                    // ガード中はダメージ1/10に軽減 (90%軽減).
-                    damage = (int)(damage * 0.1f);
-                    // プレイヤーのPowerlevelを上回れない場合吹き飛ばせない.
-                    canKnockback = false;
-                    Debug.Log($"[PlayerPresenter] Guard - ダメージ1/10軽減適用: {damage}");
-                }
-            }
 
             // ダメージ適用.
             playerStatusModel.Damage(damage);
+
+            // 被ダメージSE.
+            guardSEPlayer?.Play("SE_PlayerHurt");
 
             // 鼓動上昇: 現在の鼓動値×0.3.
             pulseModel.OnDamageTaken();
@@ -597,7 +585,7 @@ namespace InGame.Player
         private async UniTaskVoid InitializeGuardSE()
         {
             guardSEPlayer = SEPlayer.Create("PlayerGuardSE");
-            await guardSEPlayer.LoadClipsAsync("SE_Parry", "SE_Stan", "SE_Heal");
+            await guardSEPlayer.LoadClipsAsync("SE_Parry", "SE_Stan", "SE_Heal", "SE_PlayerHurt");
         }
 
         /// <summary>
@@ -663,6 +651,156 @@ namespace InGame.Player
 
             isIaiActive = false;
             playerModel.SetEnableAction(false);
+        }
+
+        // ---- 回避居合い ----
+
+        /// <summary>
+        /// 回避居合い条件チェック結果.
+        /// </summary>
+        private struct DodgeIaiResult
+        {
+            public bool shouldTriggerIai;
+            public EnemyPresenter_abstract enemy;
+            public bool isParryable;
+        }
+
+        /// <summary>
+        /// 回避入力時に居合い発動条件をチェック.
+        /// </summary>
+        private DodgeIaiResult CheckDodgeIaiCondition(Vector2 dodgeDir)
+        {
+            var result = new DodgeIaiResult { shouldTriggerIai = false };
+
+            // 敵を取得.
+            var enemy = UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>();
+            if (enemy == null) return result;
+
+            // 距離チェック.
+            Vector2 playerPos = playerModel.GetAvator() != null
+                ? (Vector2)playerModel.GetAvator().transform.position
+                : Vector2.zero;
+            Vector2 enemyPos = (Vector2)enemy.transform.position;
+            float distance = Vector2.Distance(playerPos, enemyPos);
+            if (distance > iaiDodgeDistance) return result;
+
+            // 方向チェック（Player→Enemyの方向と回避方向の角度差）.
+            if (dodgeDir != Vector2.zero && iaiDodgeAngle < 180f)
+            {
+                Vector2 toEnemy = (enemyPos - playerPos).normalized;
+                float angle = Vector2.Angle(dodgeDir.normalized, toEnemy);
+                if (angle > iaiDodgeAngle) return result;
+            }
+
+            // タイミングチェック.
+            bool isRushing = enemy.IsRushing;
+            bool isAttackImminent = enemy.IsAttackImminent
+                && UnityEngine.Time.time - enemy.AttackWarningTime <= iaiDodgeTimeWindow;
+
+            // 突進: タイミング不問（距離+方向条件のみ）.
+            // 通常攻撃: タイミング条件必須.
+            if (!isRushing && !isAttackImminent) return result;
+
+            result.shouldTriggerIai = true;
+            result.enemy = enemy;
+            result.isParryable = enemy.IsCurrentAttackParryable;
+            Debug.Log($"[PlayerPresenter] 回避居合い条件成立 - 距離:{distance:F1} 突進:{isRushing} パリィ可:{result.isParryable}");
+            return result;
+        }
+
+        /// <summary>
+        /// 回避居合いを実行: 回避 + 居合い攻撃 + 敵への効果.
+        /// </summary>
+        private async UniTaskVoid ExecuteDodgeIaiAsync(Vector2 dodgeDir, EnemyPresenter_abstract enemy, bool isParryable)
+        {
+            // 通常回避を実行（無敵+移動）.
+            playerModel.OnDodge(dodgeDir);
+
+            // パリィ不可攻撃の場合: ダメージなし、居合アニメなし、パリィSEのみ再生.
+            if (!isParryable)
+            {
+                guardSEPlayer?.Play("SE_Parry");
+                Debug.Log("[PlayerPresenter] 回避居合い → パリィ不可攻撃: ダメージ/アニメなし");
+
+                // 敵の当たり判定無効化 + 無敵延長.
+                if (enemy != null && enemy.Model != null)
+                {
+                    enemy.Model.SkipHitDetection = true;
+                    ClearSkipHitDetectionDelayed(enemy.Model).Forget();
+                }
+                ExtendDodgeInvincibility().Forget();
+                return;
+            }
+
+            // === パリィ可能攻撃: 居合い攻撃を発動 ===
+            ForceGuardEnd();
+            playerModel.OnMove(Vector2.zero);
+            isIaiActive = true;
+
+            playerAnimation?.SetAnimatorSpeed(27.0f);
+            playerAnimation?.PlayTrigger("Iai");
+
+            // ダメージを直接適用.
+            if (enemy != null && enemy.Status != null)
+            {
+                float iaiDamage = playerStatusModel.strength * playerStatusModel.strengthRate * 5f;
+                enemy.Status.OnDamaged(iaiDamage).Forget();
+
+                // ダメージカウンター表示（Iai型）.
+                bool facingRight = enemy.transform.position.x > playerModel.GetAvator().transform.position.x;
+                DamageCounterPool.Instance(false)?.Spawn(
+                    enemy.transform.position, iaiDamage, PlayerAttackType.Iai, facingRight);
+
+                Debug.Log($"[PlayerPresenter] 回避居合いダメージ適用: {iaiDamage:F0}");
+            }
+
+            // 敵スタン0.5sec（行動キャンセル）.
+            if (enemy != null && enemy.Model is EnemyModel_Wendig wendigModel)
+            {
+                wendigModel.TriggerIaiStan().Forget();
+                Debug.Log("[PlayerPresenter] 回避居合い → 敵短スタン発動（パリィ可能攻撃）");
+            }
+
+            // 居合いSE再生.
+            guardSEPlayer?.Play("SE_Parry");
+
+            // アニメーション完了を待機.
+            float iaiDuration = 1.0f;
+            await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration / 27.0f));
+            playerAnimation?.ClearActionAnimatorSpeed();
+            await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration - iaiDuration / 27.0f));
+
+            isIaiActive = false;
+        }
+
+        /// <summary>
+        /// 一定時間後にSkipHitDetectionを解除.
+        /// </summary>
+        private async UniTaskVoid ClearSkipHitDetectionDelayed(EnemyModel_abstract model)
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(1.0f));
+            if (model != null)
+            {
+                model.SkipHitDetection = false;
+                Debug.Log("[PlayerPresenter] SkipHitDetection解除");
+            }
+        }
+
+        /// <summary>
+        /// 回避無敵を延長（パリィ不可攻撃の回避居合い時）.
+        /// </summary>
+        private async UniTaskVoid ExtendDodgeInvincibility()
+        {
+            // 通常回避の無敵が切れるのを待つ（OnDodge内の0.35秒）.
+            await UniTask.Delay(TimeSpan.FromSeconds(0.35f));
+            // まだ居合い中なら無敵を維持.
+            if (isIaiActive)
+            {
+                playerModel.SetDodgeInvincible(true);
+                await UniTask.Delay(TimeSpan.FromSeconds(iaiDodgeInvincibilityExtension));
+                playerModel.SetDodgeInvincible(false);
+                Debug.Log("[PlayerPresenter] 回避無敵延長終了");
+            }
         }
 
         /// <summary>

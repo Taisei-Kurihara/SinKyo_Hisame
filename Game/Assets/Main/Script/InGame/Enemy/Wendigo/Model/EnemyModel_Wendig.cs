@@ -76,6 +76,13 @@ public class EnemyModel_Wendig : EnemyModel_abstract
         await AIModel.InterruptStateList.ExecuteInterrupt(AIModel.InterruptStateList.GetStanState(), this);
     }
 
+    // 回避居合いスタン割り込みStateを実行（0.5sec短スタン）.
+    public async UniTask TriggerIaiStan()
+    {
+        Debug.Log($"[EnemyModel_Wendig] TriggerIaiStan - {gameObject.name}");
+        await AIModel.InterruptStateList.ExecuteInterrupt(AIModel.InterruptStateList.GetIaiStanState(), this);
+    }
+
     // Bayt割り込みStateを実行.
     public async UniTask TriggerBayt()
     {
@@ -95,6 +102,13 @@ public class EnemyModel_Wendig : EnemyModel_abstract
     {
         Debug.Log($"[EnemyModel_Wendig] TriggerTripleAttack - {gameObject.name}");
         await AIModel.TripleAttackState.Act(this);
+    }
+
+    // MeteorDrop Stateを実行.
+    public async UniTask TriggerMeteorDrop()
+    {
+        Debug.Log($"[EnemyModel_Wendig] TriggerMeteorDrop - {gameObject.name}");
+        await AIModel.MeteorDropState.Act(this);
     }
 
     // バトル開始時の演出（Howling → TripleAttack）.

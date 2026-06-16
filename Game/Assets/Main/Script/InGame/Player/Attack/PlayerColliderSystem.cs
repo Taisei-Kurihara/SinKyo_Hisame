@@ -289,6 +289,9 @@ namespace InGame.Player
             // 被弾エフェクトをHit位置に攻撃方向で生成.
             HitEffectPool.Instance(false).Spawn(hitPos, facingRight);
 
+            // ダメージカウンター表示.
+            DamageCounterPool.Instance(false)?.Spawn(hitPos, damage, attackType, facingRight);
+
             // ヒットストップ発動.
             HitStopManager.Instance(false)?.PlayHitStop(attackType);
 
@@ -343,6 +346,9 @@ namespace InGame.Player
                 // エフェクト再生（最初+30度、以降15度ずつ下方向にズラす）.
                 float effectAngle = 30f - (15f * i);
                 HitEffectPool.Instance(false)?.Spawn(hitPos, facingRight, effectAngle);
+
+                // ダメージカウンター表示.
+                DamageCounterPool.Instance(false)?.Spawn(hitPos, extraDamage, attackType, facingRight, effectAngle);
 
                 // SE再生（コールバック経由）.
                 onHitCallback?.Invoke();

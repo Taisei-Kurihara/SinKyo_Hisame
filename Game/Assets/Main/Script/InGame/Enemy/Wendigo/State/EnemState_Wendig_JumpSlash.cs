@@ -232,7 +232,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
                             {
                                 colliderType = EnemColliderType.Box,
                                 offset = new Vector2(-0.1f, 0f),
-                                size = new Vector2(0.5f, 2f),
+                                size = new Vector2(1f, 2f),
                                 damage = jumpSlashDamage,
                                 duration = 0.3f,
                                 colliderState = colliderState

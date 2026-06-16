@@ -16,6 +16,7 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
     private EnemState_Wendig_Howling howlingState = new EnemState_Wendig_Howling();
     private EnemState_Wendig_TripleAttack tripleAttackState = new EnemState_Wendig_TripleAttack();
     private EnemState_Wendig_JumpSlash jumpSlashState = new EnemState_Wendig_JumpSlash();
+    private EnemState_Wendig_MeteorDrop meteorDropState = new EnemState_Wendig_MeteorDrop();
 
     // --- State公開プロパティ（Updaterからアクセス用） ---
     public EnemState_Wendig_Move MoveState => moveState;
@@ -25,6 +26,7 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
     public EnemState_Wendig_Howling HowlingState => howlingState;
     public EnemState_Wendig_TripleAttack TripleAttackState => tripleAttackState;
     public EnemState_Wendig_JumpSlash JumpSlashState => jumpSlashState;
+    public EnemState_Wendig_MeteorDrop MeteorDropState => meteorDropState;
 
     // --- 割り込みStateリスト ---
     private EnemInterruptStateList_Wendig interruptStateList = new EnemInterruptStateList_Wendig();

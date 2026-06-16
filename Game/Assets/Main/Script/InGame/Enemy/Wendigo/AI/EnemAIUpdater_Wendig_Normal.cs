@@ -429,7 +429,15 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
             if (isJumpSlash)
             {
                 float yDiff = TargetPosition.y - ownerTransform.position.y;
-                if (yDiff < 3f) continue;
+                if (yDiff < 2f) continue; // プレイヤーが上方2f以上.
+
+                // プレイヤーのY軸速度チェック: 頂点付近（Y速度 ≤ +3f）のみ発動.
+                var jumpCheckPlayer = Object.FindFirstObjectByType<InGame.Player.PlayerScope>();
+                if (jumpCheckPlayer != null)
+                {
+                    var playerRb = jumpCheckPlayer.GetComponent<Rigidbody2D>();
+                    if (playerRb != null && playerRb.linearVelocity.y > 3f) continue;
+                }
             }
 
             if (setting.actionState is EnemState_Wendig_Rush)
@@ -482,7 +490,15 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
             if (setting.actionState is EnemState_Wendig_JumpSlash)
             {
                 float yDiff = TargetPosition.y - ownerTransform.position.y;
-                if (yDiff < 3f) continue;
+                if (yDiff < 6f) continue; // 高さ閾値を3f引き上げ (3f → 6f).
+
+                // プレイヤーのY軸速度が0に近い時のみ（着地・静止中）.
+                var moveJumpCheckPlayer = Object.FindFirstObjectByType<InGame.Player.PlayerScope>();
+                if (moveJumpCheckPlayer != null)
+                {
+                    var playerRb = moveJumpCheckPlayer.GetComponent<Rigidbody2D>();
+                    if (playerRb != null && Mathf.Abs(playerRb.linearVelocity.y) > 1f) continue;
+                }
             }
 
             if (setting.actionState is EnemState_Wendig_Rush)

@@ -77,6 +77,9 @@ public abstract class EnemyModel_abstract : MonoBehaviour
         Debug.Log($"[EnemyModel_abstract] Awake完了 - Animator: {(animator != null ? "取得" : "null")}, Rigidbody: {(rigidbody != null ? "取得" : "null")}");
     }
 
+    /// <summary>回避居合い成功時に当たり判定をスキップするフラグ（パリィ不可攻撃用）.</summary>
+    public bool SkipHitDetection { get; set; } = false;
+
     // キャッシュ用Collider参照.
     private Collider2D cachedCollider;
 

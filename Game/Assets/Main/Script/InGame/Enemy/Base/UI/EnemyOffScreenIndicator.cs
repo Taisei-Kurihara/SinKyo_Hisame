@@ -32,6 +32,12 @@ public class EnemyOffScreenIndicator : MonoBehaviour
     private RectTransform canvasRect;
     private RectTransform rectTransform;
 
+    // 不明モード（方向をランダム化、距離を「?m」に表示）.
+    private bool isUnknownMode = false;
+    private float unknownModeTimer = 0f;
+    private const float unknownModeInterval = 0.8f;
+    private Vector2 unknownDirection = Vector2.right;
+
     /// <summary>
     /// インジケーターを初期化.
     /// </summary>
@@ -48,9 +54,35 @@ public class EnemyOffScreenIndicator : MonoBehaviour
         SetVisible(false);
     }
 
+    /// <summary>
+    /// 不明モード: 方向をランダム化し、距離を「?m」に表示.
+    /// MeteorDrop等で敵の位置を隠す際に使用.
+    /// </summary>
+    public void SetUnknownMode(bool enabled)
+    {
+        isUnknownMode = enabled;
+        if (enabled)
+        {
+            unknownModeTimer = unknownModeInterval; // 即座に初回ランダム方向を決定.
+        }
+    }
+
     private void LateUpdate()
     {
-        if (targetEnemy == null || mainCamera == null || canvasRect == null)
+        if (mainCamera == null || canvasRect == null)
+        {
+            SetVisible(false);
+            return;
+        }
+
+        // 不明モード: ランダム方向+「?m」表示.
+        if (isUnknownMode)
+        {
+            UpdateUnknownMode();
+            return;
+        }
+
+        if (targetEnemy == null)
         {
             SetVisible(false);
             return;
@@ -122,6 +154,51 @@ public class EnemyOffScreenIndicator : MonoBehaviour
                 mainCamera.transform.position,
                 targetPos);
             distanceText.text = $"{distance:F0}m";
+        }
+    }
+
+    /// <summary>不明モード更新: ランダム方向に矢印を表示し、距離を「?m」に.</summary>
+    private void UpdateUnknownMode()
+    {
+        SetVisible(true);
+
+        unknownModeTimer += Time.deltaTime;
+        if (unknownModeTimer >= unknownModeInterval)
+        {
+            unknownModeTimer = 0f;
+            float randomAngle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+            unknownDirection = new Vector2(Mathf.Cos(randomAngle), Mathf.Sin(randomAngle));
+        }
+
+        // 画面端にクランプ.
+        Vector2 canvasSize = canvasRect.sizeDelta;
+        float halfWidth = canvasSize.x * 0.5f - edgePadding;
+        float halfHeight = canvasSize.y * 0.5f - edgePadding;
+
+        float absX = Mathf.Abs(unknownDirection.x);
+        float absY = Mathf.Abs(unknownDirection.y);
+        float scale;
+
+        if (absX * halfHeight > absY * halfWidth)
+        {
+            scale = absX > 0.001f ? halfWidth / absX : halfHeight / absY;
+        }
+        else
+        {
+            scale = absY > 0.001f ? halfHeight / absY : halfWidth / absX;
+        }
+
+        rectTransform.anchoredPosition = unknownDirection * scale;
+
+        if (arrowImage != null)
+        {
+            float angle = Mathf.Atan2(unknownDirection.y, unknownDirection.x) * Mathf.Rad2Deg;
+            arrowImage.rectTransform.localRotation = Quaternion.Euler(0, 0, angle);
+        }
+
+        if (distanceText != null)
+        {
+            distanceText.text = "?m";
         }
     }
 

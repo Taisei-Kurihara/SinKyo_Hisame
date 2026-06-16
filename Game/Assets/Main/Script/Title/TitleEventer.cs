@@ -24,6 +24,8 @@ namespace SceneEventer
         [SerializeField]
         private VideoPlayer videoPlayer;
         [SerializeField]
+        private bool isVideoPlay = true;
+        [SerializeField]
         private CanvasGroup videoCanvasGroup;
 
         // アニメーションループ状態管理.
@@ -64,12 +66,18 @@ namespace SceneEventer
                     //new Button[]{setting},
                     new Button[]{QuitGame}
             };
+
+            if (!isVideoPlay)
+            {
+                videoPlayer?.gameObject.SetActive(false);
+                videoPlayer = null;
+            }
         }
 
         private void Start()
         {
-            // 初期状態: UI操作有効（ループ停止状態）.
-            currentAnimeState = new stateAnimeloop();
+            // 初期状態: ビデオ未再生・UI操作有効.
+            currentAnimeState = new stateAnimeloopStop();
             currentAnimeState.OnEnter(this);
         }
 

@@ -26,6 +26,9 @@ namespace SceneInfo
             // ヒットエフェクトプール初期化.
             await HitEffectPool.Instance(false).InitPool("HitEffect");
 
+            // ダメージカウンタープール初期化.
+            await DamageCounterPool.Instance(false).InitPool("DamageCounter");
+
             // プレイヤーエフェクトプール初期化（スタン:1個、回復:3個）.
             var playerEffectPool = PlayerEffectPool.Instance(false);
             await playerEffectPool.InitPool("PlayerEffect_Stun", 1);
@@ -35,6 +38,7 @@ namespace SceneInfo
 
             // BGM再生（ビルド版ではawaitしないとAddressables読み込み完了前にフローが終了する）.
             await AudioManager.Instance().LoadBgm("BGM_BaseHome");
+            AudioManager.Instance().SetBgmVolume(40);
         }
 
         void ISceneInfo.InputStart()

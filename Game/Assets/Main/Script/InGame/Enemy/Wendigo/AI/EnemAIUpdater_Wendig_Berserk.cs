@@ -40,8 +40,8 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
     private float lastRushEndTime = -100f;
     private const float postRushCooldown = 1.0f; // 通常より短い.
 
-    // 怒りHowling予約.
-    private bool pendingAngerHowling = false;
+    // 怒りMeteorDrop予約.
+    private bool pendingMeteorDrop = false;
 
     // カメラ範囲設定.
     private float cameraViewRangeX = 8f;
@@ -82,9 +82,9 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
     protected override void OnEnterAnger()
     {
-        pendingAngerHowling = true;
+        pendingMeteorDrop = true;
         ApplyCurrentSpeedModifier();
-        Debug.Log($"[WendigBerserkUpdater] 怒り開始 → Howling予約");
+        Debug.Log($"[WendigBerserkUpdater] 怒り開始 → MeteorDrop予約");
     }
 
     protected override void OnExitAnger()
@@ -107,7 +107,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
         currentActionSetting = null;
         aiStartTime = Time.time;
         lastRushEndTime = -100f;
-        pendingAngerHowling = false;
+        pendingMeteorDrop = false;
         meleeAttacksSinceLastRush = 0;
         lastMeleeAttackType = -1;
         // 怒りゲージリセット.
@@ -237,7 +237,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
     private async UniTask ProcessIdle(CancellationToken token)
     {
-        if (pendingAngerHowling)
+        if (pendingMeteorDrop)
         {
             currentState = BerserkState.AngerHowling;
             return;
@@ -430,11 +430,11 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
     private async UniTask ProcessAngerHowling(CancellationToken token)
     {
-        pendingAngerHowling = false;
+        pendingMeteorDrop = false;
         if (ownerModel is EnemyModel_Wendig wendigModelAnger)
         {
-            Debug.Log($"[WendigBerserkUpdater] ★怒りHowling実行★");
-            await wendigModelAnger.TriggerHowling();
+            Debug.Log($"[WendigBerserkUpdater] ★MeteorDrop実行★");
+            await wendigModelAnger.TriggerMeteorDrop();
         }
         currentState = BerserkState.Idle;
     }
@@ -525,7 +525,15 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
             if (isJumpSlash)
             {
                 float yDiff = TargetPosition.y - ownerTransform.position.y;
-                if (yDiff < 3f) continue;
+                if (yDiff < 2f) continue; // プレイヤーが上方2f以上.
+
+                // プレイヤーのY軸速度チェック: 頂点付近（Y速度 ≤ +3f）のみ発動.
+                var jumpCheckPlayer = Object.FindFirstObjectByType<InGame.Player.PlayerScope>();
+                if (jumpCheckPlayer != null)
+                {
+                    var playerRb = jumpCheckPlayer.GetComponent<Rigidbody2D>();
+                    if (playerRb != null && playerRb.linearVelocity.y > 3f) continue;
+                }
             }
 
             if (setting.actionState is EnemState_Wendig_Rush)
@@ -578,7 +586,15 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
             if (setting.actionState is EnemState_Wendig_JumpSlash)
             {
                 float yDiff = TargetPosition.y - ownerTransform.position.y;
-                if (yDiff < 3f) continue;
+                if (yDiff < 6f) continue; // 高さ閾値を3f引き上げ (3f → 6f).
+
+                // プレイヤーのY軸速度が0に近い時のみ（着地・静止中）.
+                var moveJumpCheckPlayer = Object.FindFirstObjectByType<InGame.Player.PlayerScope>();
+                if (moveJumpCheckPlayer != null)
+                {
+                    var playerRb = moveJumpCheckPlayer.GetComponent<Rigidbody2D>();
+                    if (playerRb != null && Mathf.Abs(playerRb.linearVelocity.y) > 1f) continue;
+                }
             }
 
             if (setting.actionState is EnemState_Wendig_Rush)

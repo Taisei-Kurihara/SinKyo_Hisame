@@ -51,6 +51,35 @@ namespace InGame.Player
         [SerializeField] private CanvasGroup win;
         [SerializeField] private CanvasGroup lose;
 
+        [Header("OverlapTransparency マスク制御")]
+        [SerializeField] private Material overlapSharedMaterial;
+        private Material overlapMaterial;
+
+        // オーバーレイ演出用の状態（心拍数 + HP連動）.
+        private int overlayHeartRate = 100;
+        private float overlayHpPercent = 1f;
+
+        // 脈動アニメーション用（C#側で管理 / current→targetを毎フレーム補間）.
+        private float overlayTargetTiling = 0f;
+        private float overlayCurrentTiling = 0f;
+        private float overlayTargetSpeed = 4f;
+        private float overlayCurrentSpeed = 4f;
+        private float overlayTargetAmplitude = 0.14f;
+        private float overlayCurrentAmplitude = 0.14f;
+        private Color overlayTargetColor = new Color(0f, 0f, 0f, 0f);
+        private Color overlayCurrentColor = new Color(0f, 0f, 0f, 0f);
+        private float overlayPhase = 0f;
+        private const float overlaySmoothRate = 3f;
+
+        [Header("ブラー制御（心拍数連動）")]
+        [SerializeField] private List<Material> blurMaterials = new();
+        [SerializeField] private float blurMaxSize = 20f;
+
+        private float blurTargetSize = 0f;
+        private float blurCurrentSize = 0f;
+        private float blurTargetAlpha = 1f;
+        private float blurCurrentAlpha = 1f;
+
         [Header("DPS表示")]
         [SerializeField] private TextMeshProUGUI dpsText;
         // DPS計算用ダメージ履歴.
@@ -102,6 +131,9 @@ namespace InGame.Player
                 float percent = Mathf.Clamp01(heartRate / 200f);
                 targetHeartFill = 0.25f + percent * (0.805f - 0.25f);
             }
+
+            overlayHeartRate = heartRate;
+            UpdateOverlayEffect();
         }
 
         public void SetHpGauge(float percent)
@@ -137,6 +169,9 @@ namespace InGame.Player
                 }
                 HpGauge.color = hpColor;
             }
+
+            overlayHpPercent = percent;
+            UpdateOverlayEffect();
         }
 
         private void Update()
@@ -165,6 +200,43 @@ namespace InGame.Player
                 float maxDelta = (0.805f - 0.25f) / heartGageAnimDuration * Time.deltaTime;
                 currentHeartFill = Mathf.MoveTowards(currentHeartFill, targetHeartFill, maxDelta);
                 heartGage.fillAmount = currentHeartFill;
+            }
+
+            // オーバーレイ脈動アニメーション（全パラメータを滑らかに補間）.
+            {
+                var mat = GetOverlapMaterial();
+                if (mat != null)
+                {
+                    float s = 1f - Mathf.Exp(-overlaySmoothRate * Time.deltaTime);
+                    overlayCurrentTiling = Mathf.Lerp(overlayCurrentTiling, overlayTargetTiling, s);
+                    overlayCurrentSpeed = Mathf.Lerp(overlayCurrentSpeed, overlayTargetSpeed, s);
+                    overlayCurrentAmplitude = Mathf.Lerp(overlayCurrentAmplitude, overlayTargetAmplitude, s);
+                    overlayCurrentColor = Color.Lerp(overlayCurrentColor, overlayTargetColor, s);
+
+                    // 位相を蓄積（speed変化時に位相ジャンプしない）.
+                    overlayPhase += overlayCurrentSpeed * Time.deltaTime;
+
+                    float pulse = overlayCurrentTiling *
+                        (1f + overlayCurrentAmplitude * Mathf.Sin(overlayPhase));
+                    mat.SetTextureScale("_MaskTex", new Vector2(pulse, pulse));
+                    mat.SetColor("_Color", overlayCurrentColor);
+                }
+            }
+
+            // ブラー演出（心拍数連動）を滑らかに補間・適用.
+            {
+                float s2 = 1f - Mathf.Exp(-overlaySmoothRate * Time.deltaTime);
+                blurCurrentSize = Mathf.Lerp(blurCurrentSize, blurTargetSize, s2);
+                blurCurrentAlpha = Mathf.Lerp(blurCurrentAlpha, blurTargetAlpha, s2);
+
+                for (int i = 0; i < blurMaterials.Count; i++)
+                {
+                    if (blurMaterials[i] != null)
+                    {
+                        blurMaterials[i].SetFloat("_BlurSize", blurCurrentSize);
+                        blurMaterials[i].SetFloat("_BlurAlpha", blurCurrentAlpha);
+                    }
+                }
             }
 
             // Bキーで DPS表示の有効/無効を切り替え.
@@ -259,6 +331,123 @@ namespace InGame.Player
         public void SetLoseAlpha(float alpha)
         {
             if (lose != null) lose.alpha = alpha;
+        }
+
+        // ---- OverlapTransparency マスク制御 ----
+
+        /// <summary>ランタイムでRendererを指定（per-instanceマテリアル取得）.</summary>
+        public void SetOverlapTarget(Renderer renderer)
+        {
+            if (renderer != null)
+            {
+                overlapMaterial = renderer.material;
+            }
+        }
+
+        private Material GetOverlapMaterial()
+        {
+            if (overlapMaterial == null && overlapSharedMaterial != null)
+            {
+                overlapMaterial = overlapSharedMaterial;
+            }
+            return overlapMaterial;
+        }
+
+        /// <summary>マスクテクスチャのTilingを設定.</summary>
+        public void SetMaskTiling(Vector2 tiling)
+        {
+            var mat = GetOverlapMaterial();
+            if (mat != null) mat.SetTextureScale("_MaskTex", tiling);
+        }
+
+        /// <summary>マスクテクスチャのOffsetを設定.</summary>
+        public void SetMaskOffset(Vector2 offset)
+        {
+            var mat = GetOverlapMaterial();
+            if (mat != null) mat.SetTextureOffset("_MaskTex", offset);
+        }
+
+        /// <summary>マスクテクスチャを差し替え.</summary>
+        public void SetMaskTexture(Texture texture)
+        {
+            var mat = GetOverlapMaterial();
+            if (mat != null) mat.SetTexture("_MaskTex", texture);
+        }
+
+        // ---- 心拍数 + HP連動オーバーレイ演出 ----
+
+        /// <summary>
+        /// 心拍数とHP状態からオーバーレイ演出パラメータを算出・適用.
+        /// </summary>
+        private void UpdateOverlayEffect()
+        {
+            var mat = GetOverlapMaterial();
+            if (mat == null) return;
+
+            float hrTiling, hrSpeed, hrAmplitude;
+            Color hrColor;
+
+            if (overlayHeartRate < 100)
+            {
+                // ---- HR < 100: 黒オーバーレイ ----
+                hrColor = new Color(0f, 0f, 0f, 1f);
+                // HR 100→30 で tiling 0.7→1.0.
+                float tTile = Mathf.InverseLerp(100f, 30f, overlayHeartRate);
+                hrTiling = Mathf.Lerp(0.7f, 1.0f, tTile);
+                hrAmplitude = 0.4f;
+                // HR 30→70 で speed 2→5.
+                float t = Mathf.InverseLerp(30f, 70f, overlayHeartRate);
+                hrSpeed = Mathf.Lerp(2f, 5f, t);
+            }
+            else
+            {
+                // ---- HR >= 100: 赤オーバーレイ ----
+                hrColor = new Color(170f / 255f, 0f, 0f, 170f / 255f);
+                // HR 100→180 で tiling 0→0.7, speed 4→15.
+                float t = Mathf.InverseLerp(100f, 180f, overlayHeartRate);
+                hrTiling = Mathf.Lerp(0f, 0.7f, t);
+                hrSpeed = Mathf.Lerp(4f, 15f, t);
+                hrAmplitude = 0.14f;
+            }
+
+            // ---- 低HP演出（HP < 0.33）: 心拍数パラメータと平均 ----
+            if (overlayHpPercent < 0.33f)
+            {
+                Color hpColor = new Color(130f / 255f, 0f, 0f, 170f / 255f);
+                float hpTiling = 1.5f;
+                float hpAmplitude = 0.35f;
+                float hpSpeed = 2f;
+
+                hrColor = (hrColor + hpColor) * 0.5f;
+                hrTiling = (hrTiling + hpTiling) * 0.5f;
+                hrAmplitude = (hrAmplitude + hpAmplitude) * 0.5f;
+                hrSpeed = (hrSpeed + hpSpeed) * 0.5f;
+            }
+
+            // ターゲット値を設定（Update()で毎フレーム滑らかに補間適用）.
+            overlayTargetColor = hrColor;
+            overlayTargetTiling = hrTiling;
+            overlayTargetSpeed = hrSpeed;
+            overlayTargetAmplitude = hrAmplitude;
+
+            // ---- ブラー制御（HR < 100 で 0→max, alpha 1→0.7）----
+            // ---- カメラズーム（HR < 100 でプレイヤー中心にズーム、端無視）----
+            if (overlayHeartRate < 100)
+            {
+                float tBlur = Mathf.InverseLerp(100f, 30f, overlayHeartRate);
+                blurTargetSize = Mathf.Lerp(0f, blurMaxSize, tBlur);
+                blurTargetAlpha = Mathf.Lerp(1f, 0.7f, tBlur);
+
+                // HR 100→30 でズーム 1.0→0.7.
+                float zoomFactor = Mathf.Lerp(1f, 0.7f, tBlur);
+                global::Common.CameraManager.Instance(false)?.SetHeartRateZoom(zoomFactor);
+            }
+            else
+            {
+                blurTargetSize = 0f;
+                blurTargetAlpha = 1f;
+                global::Common.CameraManager.Instance(false)?.SetHeartRateZoom(1f);
+            }
         }
 
         // ---- DPS計測 ----

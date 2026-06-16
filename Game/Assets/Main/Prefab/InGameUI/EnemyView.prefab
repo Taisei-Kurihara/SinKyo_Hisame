@@ -99,7 +99,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 4
   m_TargetDisplay: 0
 --- !u!114 &2834844614167085048
 MonoBehaviour:
@@ -212,7 +212,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 2100000, guid: 3c5192d1411038e4d90ee6f3b8edfbf2, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
@@ -287,7 +287,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 2100000, guid: 3c5192d1411038e4d90ee6f3b8edfbf2, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
@@ -372,8 +372,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: EnemyName
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: e13a81cbc8f97e74db8cfe3ada0e5dce, type: 2}
-  m_sharedMaterial: {fileID: -7469414728289056275, guid: e13a81cbc8f97e74db8cfe3ada0e5dce, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 20a0ccf224e8c40438aacc99cd2ec0e5, type: 2}
+  m_sharedMaterial: {fileID: -6087535585406322814, guid: 20a0ccf224e8c40438aacc99cd2ec0e5, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

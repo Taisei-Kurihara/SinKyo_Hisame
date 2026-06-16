@@ -26,6 +26,11 @@ public abstract class EnemAIUpdater_Wendig_abstract : EnemAIUpdater_abstract
     // 現在の速度修正.
     protected WendigSpeedModifier currentSpeedModifier = WendigSpeedModifier.Default;
 
+    // --- 怒りビジュアル ---
+    private SpriteRenderer[] cachedRenderers = null;
+    private bool isAngerBlinking = false;
+    private CancellationTokenSource angerVisualCts = null;
+
     public EnemAIUpdater_Wendig_abstract(EnemAIModel_Wendig_Normal master) : base(master)
     {
         WendigMasterAI = master;
@@ -63,11 +68,18 @@ public abstract class EnemAIUpdater_Wendig_abstract : EnemAIUpdater_abstract
         }
     }
 
-    /// <summary>減衰: 通常1/sec、怒り中3/sec.</summary>
+    /// <summary>減衰: 通常1/sec、怒り中3/sec. 怒り中はビジュアル更新も行う.</summary>
     protected override void DecayAngerGauge(float deltaTime)
     {
         float rate = isAngry ? angryDecayPerSec : normalDecayPerSec;
         angerGauge = Mathf.Max(0f, angerGauge - rate * deltaTime);
+
+        // 怒り中かつ点滅中でなければ、ゲージ残量に応じた赤色を適用.
+        if (isAngry && !isAngerBlinking)
+        {
+            float t = angerGaugeThreshold > 0f ? angerGauge / angerGaugeThreshold : 0f;
+            UpdateAngerTint(t);
+        }
 
         if (isAngry && angerGauge <= 0f)
         {
@@ -77,14 +89,36 @@ public abstract class EnemAIUpdater_Wendig_abstract : EnemAIUpdater_abstract
 
     protected override void EnterAngerState()
     {
+        // 前回のビジュアル処理をキャンセル.
+        CancelAngerVisual();
+        angerVisualCts = new CancellationTokenSource();
+
         base.EnterAngerState();
+        PlayAngerStartBlink(angerVisualCts.Token).Forget();
         OnEnterAnger();
     }
 
     protected override void ExitAngerState()
     {
+        // 点滅/ビジュアルをキャンセルしてからフェードリセット.
+        CancelAngerVisual();
+        angerVisualCts = new CancellationTokenSource();
+        PlayAngerExitFade(angerVisualCts.Token).Forget();
+
         base.ExitAngerState();
         OnExitAnger();
+    }
+
+    /// <summary>怒りビジュアル用CTSをキャンセル・破棄.</summary>
+    private void CancelAngerVisual()
+    {
+        if (angerVisualCts != null)
+        {
+            angerVisualCts.Cancel();
+            angerVisualCts.Dispose();
+            angerVisualCts = null;
+        }
+        isAngerBlinking = false;
     }
 
     /// <summary>怒り開始時の追加処理（子クラスでoverride）.</summary>
@@ -115,5 +149,111 @@ public abstract class EnemAIUpdater_Wendig_abstract : EnemAIUpdater_abstract
     protected float GetApproachSpeed(float baseSpeed)
     {
         return baseSpeed * currentSpeedModifier.speedMultiplier;
+    }
+
+    // === 怒りビジュアルエフェクト ===
+
+    /// <summary>SpriteRendererをキャッシュ取得.</summary>
+    private SpriteRenderer[] GetRenderers()
+    {
+        if (cachedRenderers == null && masterAI.OwnerModel?.Presenter != null)
+        {
+            cachedRenderers = masterAI.OwnerModel.Presenter.GetComponentsInChildren<SpriteRenderer>();
+        }
+        return cachedRenderers;
+    }
+
+    /// <summary>怒り開始時の赤点滅（3回 / 1.3秒）.</summary>
+    private async UniTaskVoid PlayAngerStartBlink(CancellationToken ct)
+    {
+        var renderers = GetRenderers();
+        if (renderers == null || renderers.Length == 0) return;
+
+        isAngerBlinking = true;
+        float cycleDuration = 1.3f / 3f;
+        int halfCycleMs = (int)(cycleDuration * 0.5f * 1000f);
+
+        try
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                SetRenderersColor(renderers, Color.red);
+                await UniTask.Delay(halfCycleMs, cancellationToken: ct);
+                SetRenderersColor(renderers, Color.white);
+                await UniTask.Delay(halfCycleMs, cancellationToken: ct);
+            }
+        }
+        catch (System.OperationCanceledException) { }
+        finally
+        {
+            isAngerBlinking = false;
+        }
+    }
+
+    /// <summary>怒り解除時の滑らかな色フェード（現在色→白）.</summary>
+    private async UniTaskVoid PlayAngerExitFade(CancellationToken ct)
+    {
+        var renderers = GetRenderers();
+        if (renderers == null || renderers.Length == 0) return;
+
+        // 現在の色を取得（最初のRendererから）.
+        Color startColor = Color.white;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+            {
+                startColor = renderers[i].color;
+                break;
+            }
+        }
+
+        // 既に白ならスキップ.
+        if (startColor == Color.white) return;
+
+        float fadeDuration = 0.4f;
+        float elapsed = 0f;
+
+        try
+        {
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / fadeDuration);
+                Color current = Color.Lerp(startColor, Color.white, t);
+                SetRenderersColor(renderers, current);
+                await UniTask.Yield(ct);
+            }
+            SetRenderersColor(renderers, Color.white);
+        }
+        catch (System.OperationCanceledException) { }
+    }
+
+    /// <summary>怒りゲージ残量に応じた赤色を適用.</summary>
+    private void UpdateAngerTint(float intensity)
+    {
+        var renderers = GetRenderers();
+        if (renderers == null) return;
+        Color tint = Color.Lerp(Color.white, new Color(1f, 0.4f, 0.4f), intensity);
+        SetRenderersColor(renderers, tint);
+    }
+
+    /// <summary>怒りビジュアルをリセット（白に戻す）.</summary>
+    private void ClearAngerTint()
+    {
+        var renderers = GetRenderers();
+        if (renderers == null) return;
+        SetRenderersColor(renderers, Color.white);
+    }
+
+    /// <summary>全SpriteRendererの色を設定.</summary>
+    private void SetRenderersColor(SpriteRenderer[] renderers, Color color)
+    {
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null)
+            {
+                renderers[i].color = color;
+            }
+        }
     }
 }

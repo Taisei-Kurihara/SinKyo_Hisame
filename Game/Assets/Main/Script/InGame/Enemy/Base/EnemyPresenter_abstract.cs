@@ -71,6 +71,7 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
 
     // 画面外インジケーター.
     protected EnemyOffScreenIndicator offScreenIndicator;
+    public EnemyOffScreenIndicator OffScreenIndicator => offScreenIndicator;
 
     // SE再生用.
     protected SEClipRegistry seRegistry;
@@ -97,16 +98,37 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
         }
     }
 
+    // ---- 攻撃タイミング公開（回避居合い判定用） ----
+    /// <summary>攻撃が間近かどうか（PlayAttackWarning〜攻撃終了の間true）.</summary>
+    public bool IsAttackImminent { get; private set; }
+    /// <summary>攻撃通告が再生された時刻.</summary>
+    public float AttackWarningTime { get; private set; }
+    /// <summary>現在の攻撃がパリィ可能か.</summary>
+    public bool IsCurrentAttackParryable { get; private set; }
+    /// <summary>突進中フラグ（Rush stateからセット）.</summary>
+    public bool IsRushing { get; set; }
+
+    /// <summary>攻撃タイミングフラグをリセット.</summary>
+    public void ClearAttackImminent()
+    {
+        IsAttackImminent = false;
+        IsRushing = false;
+    }
+
     /// <summary>
     /// 攻撃通告を再生.
     /// </summary>
     /// <param name="isParryable">パリィ可能な攻撃ならtrue.</param>
     public void PlayAttackWarning(bool isParryable)
     {
+        IsAttackImminent = true;
+        AttackWarningTime = Time.time;
+        IsCurrentAttackParryable = isParryable;
+
         if (attackWarningAnimator == null) return;
         attackWarningAnimator.SetTrigger(isParryable ? "Yellow" : "Red");
         // 攻撃前SE再生.
-        PlaySE("AttackPre");
+        PlaySE(isParryable ? "AttackPre" : "AttackPreUnparryable");
     }
 
 

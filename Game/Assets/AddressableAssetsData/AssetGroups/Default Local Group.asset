@@ -65,6 +65,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2725728b7b4a1944e886c8229d599a1a
+    m_Address: DamageCounter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2a1824f859389da4ebbfc927b7420895
     m_Address: Assets/Main/Animation/Character/Character.controller
     m_ReadOnly: 0
@@ -107,6 +112,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4790206eadc817b4196e071640e653af
     m_Address: HitEffect
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4dbac9dfee5c7094583c1b72f770d175
+    m_Address: SE_PlayerHurt
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -170,6 +180,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 73b096dac6186734890d804f742c169e
+    m_Address: SE_Parry_Fail
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 74a3b20ceade6e749b9108897911c6e7
     m_Address: "Assets/Main/UI/\u30D7\u30EC\u30A4\u30E4\u30FC\u4F53\u529B\u30B2\u30FC\u30B8/UI_HPAccessories.png"
     m_ReadOnly: 0
@@ -207,6 +222,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 85161dd3303e59e47920582a5c57bbf2
     m_Address: SE_AttackHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 868bb1b7c0d2e43498ebc910bb617556
+    m_Address: Tutorial
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -302,6 +322,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c1ada1bf77a9ced499844513a9b29c90
     m_Address: Assets/Main/Animation/Character/Walk.anim
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c69caffcae62ceb40bdf6578ddcdab3d
+    m_Address: BloodSplatter
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

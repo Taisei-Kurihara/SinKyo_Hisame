@@ -38,6 +38,13 @@ namespace Common
         // timeScale=0中でもカメラ動作を有効にするフラグ.
         public bool UseUnscaledTime { get; set; } = false;
 
+        // --- 心拍数連動ズーム ---
+        private float heartRateZoomTarget = 1f;  // 1 = 通常, <1 = ズームイン.
+        private float heartRateZoomCurrent = 1f;
+        private float baseOrthoSize = -1f;
+        private float baseFOV = -1f;
+        private const float heartRateZoomSmoothRate = 3f;
+
 
 
 
@@ -52,6 +59,12 @@ namespace Common
             else
             {
                 initialLocalPos = mainCamera.transform.localPosition;
+
+                // 心拍ズーム用のベース値を保存.
+                if (mainCamera.orthographic)
+                    baseOrthoSize = mainCamera.orthographicSize;
+                else
+                    baseFOV = mainCamera.fieldOfView;
             }
         }
 
@@ -65,25 +78,29 @@ namespace Common
 
             if (mainCamera == null || followerObject == null) return;
 
+            float dt = UseUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+
             if (isFollowing)
             {
                 Vector3 targetPos = followerObject.position + offset;
 
-                // カメラ境界でクランプ.
-                if (hasBounds)
+                // 心拍ズーム中はカメラ境界を無視.
+                if (hasBounds && heartRateZoomTarget >= 1f)
                 {
                     targetPos.x = Mathf.Clamp(targetPos.x, boundsMinX, boundsMaxX);
                     targetPos.y = Mathf.Clamp(targetPos.y, boundsMinY, boundsMaxY);
                 }
 
                 // スムーズに追従.
-                float dt = UseUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
                 mainCamera.transform.position = Vector3.Lerp(
                     mainCamera.transform.position,
                     targetPos,
                     followSpeed * dt
                 );
             }
+
+            // 心拍数連動ズーム適用.
+            ApplyHeartRateZoom(dt);
         }
         #region カメラ境界
 
@@ -465,6 +482,40 @@ namespace Common
                 defaultOrthoSize = Mathf.Max(0.01f, zoomOrSize);
             else
                 defaultZoom = Mathf.Clamp(zoomOrSize, 1f, 179f);
+        }
+
+        #endregion
+
+        #region 心拍数連動ズーム
+
+        /// <summary>
+        /// 心拍数連動ズーム倍率を設定（1.0=通常, 0.7=30%ズームイン）.
+        /// </summary>
+        public void SetHeartRateZoom(float factor)
+        {
+            heartRateZoomTarget = Mathf.Clamp(factor, 0.1f, 1f);
+        }
+
+        /// <summary>
+        /// 心拍ズームを滑らかに適用.
+        /// </summary>
+        private void ApplyHeartRateZoom(float dt)
+        {
+            if (mainCamera == null) return;
+
+            // ベース値未設定なら現在値を保存.
+            if (baseOrthoSize < 0f) baseOrthoSize = mainCamera.orthographicSize;
+            if (baseFOV < 0f) baseFOV = mainCamera.fieldOfView;
+
+            // 目標値に向けて滑らかに補間.
+            float s = 1f - Mathf.Exp(-heartRateZoomSmoothRate * dt);
+            heartRateZoomCurrent = Mathf.Lerp(heartRateZoomCurrent, heartRateZoomTarget, s);
+
+            // ズーム適用.
+            if (mainCamera.orthographic)
+                mainCamera.orthographicSize = baseOrthoSize * heartRateZoomCurrent;
+            else
+                mainCamera.fieldOfView = baseFOV * heartRateZoomCurrent;
         }
 
         #endregion

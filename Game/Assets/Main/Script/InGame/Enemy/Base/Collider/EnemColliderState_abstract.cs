@@ -85,6 +85,17 @@ public abstract class EnemColliderState_abstract
     // プレイヤーにダメージを与える共通処理.
     protected GuardState DamagePlayer(GameObject target, int attackDamage)
     {
+        // SkipHitDetection が true の場合（回避居合い成功時）はダメージをスキップ.
+        if (attackerTransform != null)
+        {
+            var enemyModel = attackerTransform.GetComponent<EnemyModel_abstract>();
+            if (enemyModel != null && enemyModel.SkipHitDetection)
+            {
+                Debug.Log($"[EnemColliderState_abstract] DamagePlayer - SkipHitDetection有効、ダメージスキップ");
+                return GuardState.None;
+            }
+        }
+
         var playerScope = target.GetComponent<PlayerScope>();
         if (playerScope == null)
         {

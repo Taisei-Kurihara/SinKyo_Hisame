@@ -219,6 +219,9 @@ namespace InGame.Common
             var playerAnim = UnityEngine.Object.FindFirstObjectByType<PlayerAnimationController>();
             if (playerAnim != null) playerAnim.PlayTrigger("sheathing_of_sword");
 
+            // カメラ境界を解除（ズーム中にクランプされないように）.
+            cam.ClearBounds();
+
             if (enemyTransform != null)
             {
                 cam.SetFollowTarget(enemyTransform);

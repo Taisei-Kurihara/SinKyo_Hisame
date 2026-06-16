@@ -124,6 +124,7 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         // 攻撃通告: パリィ不可 (突進の0.3秒前).
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
         enemyModel.Presenter.PlayAttackWarning(false);
+        enemyModel.Presenter.IsRushing = true;
         await UniTask.Delay((int)(300 / animSpeed));
     }
 
@@ -209,6 +210,10 @@ public class EnemState_Wendig_Rush : EnemState_abstract
 
     protected override async UniTask OnPrePostAction(EnemyModel_abstract enemyModel)
     {
+        if (EnemNullSafetyHelper.IsValid(enemyModel))
+        {
+            enemyModel.Presenter?.ClearAttackImminent();
+        }
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
             animator.SetTrigger("Assault_End");

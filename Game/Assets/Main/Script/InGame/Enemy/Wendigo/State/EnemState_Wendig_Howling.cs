@@ -66,7 +66,7 @@ public class EnemState_Wendig_Howling : EnemState_abstract
             new EnemColliderHelper.ColliderPhaseConfig
             {
                 colliderType = EnemColliderType.Circle,
-                offset = Vector2.zero,
+                offset = new Vector2(0f, 1f),
                 radius = attackRadius,
                 damage = attackDamage,
                 duration = 0.5f,
@@ -80,6 +80,10 @@ public class EnemState_Wendig_Howling : EnemState_abstract
 
     protected override async UniTask OnAfterPostAction(EnemyModel_abstract enemyModel)
     {
+        if (EnemNullSafetyHelper.IsValid(enemyModel))
+        {
+            enemyModel.Presenter?.ClearAttackImminent();
+        }
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
             enemyModel.Animator.SetTrigger("Howling_End");

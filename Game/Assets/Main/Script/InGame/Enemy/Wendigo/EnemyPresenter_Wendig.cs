@@ -36,8 +36,9 @@ public class EnemyPresenter_Wendig : EnemyPresenter_abstract
         // Wendigo用SEアクション登録.
         seRegistry.Register("Stan", "SE_Stan");
         seRegistry.Register("AttackPre", "SE_AttackPre");
+        seRegistry.Register("AttackPreUnparryable", "SE_Parry_Fail");
 
         // AudioClip読み込み（SE未登録の場合は警告が出るが処理は継続）.
-        await sePlayer.LoadClipsAsync("SE_Stan", "SE_AttackPre");
+        await sePlayer.LoadClipsAsync("SE_Stan", "SE_AttackPre", "SE_Parry_Fail");
     }
 }

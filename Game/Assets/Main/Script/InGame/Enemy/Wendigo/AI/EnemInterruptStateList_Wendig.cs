@@ -11,6 +11,7 @@ public class EnemInterruptStateList_Wendig
     // Wendig用の割り込みState.
     private EnemInterruptState_Dead_Wendig deadState = new EnemInterruptState_Dead_Wendig();
     private EnemInterruptState_Stan_Wendig stanState = new EnemInterruptState_Stan_Wendig();
+    private EnemInterruptState_IaiStan_Wendig iaiStanState = new EnemInterruptState_IaiStan_Wendig();
     private EnemInterruptState_Bayt_Wendig baytState = new EnemInterruptState_Bayt_Wendig();
 
     // 現在実行中の割り込みState.
@@ -22,6 +23,7 @@ public class EnemInterruptStateList_Wendig
         // 優先度順に追加.
         interruptStates.Add(deadState);
         interruptStates.Add(stanState);
+        interruptStates.Add(iaiStanState);
         interruptStates.Add(baytState);
         Debug.Log($"[EnemInterruptStateList_Wendig] 初期化完了 - State数: {interruptStates.Count}");
     }
@@ -36,6 +38,12 @@ public class EnemInterruptStateList_Wendig
     public EnemInterruptState_Stan_Wendig GetStanState()
     {
         return stanState;
+    }
+
+    // IaiStan Stateを取得（回避居合い用短スタン）.
+    public EnemInterruptState_IaiStan_Wendig GetIaiStanState()
+    {
+        return iaiStanState;
     }
 
     // Bayt Stateを取得.

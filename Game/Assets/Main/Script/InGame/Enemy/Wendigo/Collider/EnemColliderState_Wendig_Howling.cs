@@ -18,6 +18,24 @@ public class EnemColliderState_Wendig_Howling : EnemColliderState_PlayerDamage
     protected override void OnHit(GameObject target, Collider2D hitCollider)
     {
         Debug.Log($"[EnemColliderState_Wendig_Howling] OnHit - Target: {target.name}, Damage: {damage}");
-        GuardState guardState = DamagePlayer(target, damage);
+
+        // Howlingは円形攻撃 — ノックバック方向は敵からの相対位置で決定（向き依存ではない）.
+        float knockbackDirX = 1f;
+        if (attackerTransform != null && target != null)
+        {
+            float relativeX = target.transform.position.x - attackerTransform.position.x;
+            knockbackDirX = relativeX >= 0 ? 1f : -1f;
+        }
+
+        var playerScope = target.GetComponent<PlayerScope>();
+        if (playerScope == null)
+        {
+            Debug.Log($"[EnemColliderState_Wendig_Howling] PlayerScopeが見つからない: {target.name}");
+            return;
+        }
+
+        var damageData = new DamageData(damage, powerlevel, knockbackForce, knockbackDirX);
+        GuardState guardState = playerScope.OnReceiveAttack(damageData);
+        Debug.Log($"[EnemColliderState_Wendig_Howling] ダメージ処理結果 ガード状態={guardState}, 方向={knockbackDirX}");
     }
 }

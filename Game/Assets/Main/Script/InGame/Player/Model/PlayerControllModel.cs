@@ -350,6 +350,9 @@ namespace InGame.Player
         private bool isDodgeInvincible = false;
         public bool IsDodgeInvincible => isDodgeInvincible;
 
+        /// <summary>回避無敵を外部から設定（回避居合い無敵延長用）.</summary>
+        public void SetDodgeInvincible(bool value) => isDodgeInvincible = value;
+
         // -------------------------
         // 残像エフェクト
         // -------------------------

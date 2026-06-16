@@ -95,6 +95,10 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
 
     protected override async UniTask OnAfterPostAction(EnemyModel_abstract enemyModel)
     {
+        if (EnemNullSafetyHelper.IsValid(enemyModel))
+        {
+            enemyModel.Presenter?.ClearAttackImminent();
+        }
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
         {
             enemyModel.Animator.ResetTrigger("Attack");
