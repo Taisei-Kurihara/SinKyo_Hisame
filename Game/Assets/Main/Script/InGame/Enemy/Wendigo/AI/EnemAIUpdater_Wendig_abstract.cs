@@ -64,7 +64,7 @@ public abstract class EnemAIUpdater_Wendig_abstract : EnemAIUpdater_abstract
 
         if (!isAngry && angerGauge >= angerGaugeThreshold)
         {
-            EnterAngerState();
+            // EnterAngerState(); // 怒り状態遷移を一時停止.
         }
     }
 
@@ -226,6 +226,14 @@ public abstract class EnemAIUpdater_Wendig_abstract : EnemAIUpdater_abstract
             SetRenderersColor(renderers, Color.white);
         }
         catch (System.OperationCanceledException) { }
+    }
+
+    /// <summary>バーサーク(第二形態)用の常時赤色を適用.</summary>
+    protected void ApplyBerserkTint()
+    {
+        var renderers = GetRenderers();
+        if (renderers == null) return;
+        SetRenderersColor(renderers, new Color(1f, 0.4f, 0.4f));
     }
 
     /// <summary>怒りゲージ残量に応じた赤色を適用.</summary>

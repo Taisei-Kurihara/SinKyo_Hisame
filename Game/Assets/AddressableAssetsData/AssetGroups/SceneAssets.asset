@@ -25,8 +25,8 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: 7bd9c71c837385641989576ec32b76c2
-    m_Address: Setting
+  - m_GUID: 868bb1b7c0d2e43498ebc910bb617556
+    m_Address: Tutorial
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

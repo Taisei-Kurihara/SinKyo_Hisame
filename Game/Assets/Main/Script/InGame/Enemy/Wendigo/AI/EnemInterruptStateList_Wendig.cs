@@ -12,6 +12,8 @@ public class EnemInterruptStateList_Wendig
     private EnemInterruptState_Dead_Wendig deadState = new EnemInterruptState_Dead_Wendig();
     private EnemInterruptState_Stan_Wendig stanState = new EnemInterruptState_Stan_Wendig();
     private EnemInterruptState_IaiStan_Wendig iaiStanState = new EnemInterruptState_IaiStan_Wendig();
+    private EnemInterruptState_ParryStan_Wendig parryStan = new EnemInterruptState_ParryStan_Wendig();
+    private EnemInterruptState_MeteorDropStan_Wendig meteorDropStanState = new EnemInterruptState_MeteorDropStan_Wendig();
     private EnemInterruptState_Bayt_Wendig baytState = new EnemInterruptState_Bayt_Wendig();
 
     // 現在実行中の割り込みState.
@@ -24,6 +26,8 @@ public class EnemInterruptStateList_Wendig
         interruptStates.Add(deadState);
         interruptStates.Add(stanState);
         interruptStates.Add(iaiStanState);
+        interruptStates.Add(parryStan);
+        interruptStates.Add(meteorDropStanState);
         interruptStates.Add(baytState);
         Debug.Log($"[EnemInterruptStateList_Wendig] 初期化完了 - State数: {interruptStates.Count}");
     }
@@ -44,6 +48,18 @@ public class EnemInterruptStateList_Wendig
     public EnemInterruptState_IaiStan_Wendig GetIaiStanState()
     {
         return iaiStanState;
+    }
+
+    // ParryStan Stateを取得（回避パリィ用1secスタン）.
+    public EnemInterruptState_ParryStan_Wendig GetParryStanState()
+    {
+        return parryStan;
+    }
+
+    // MeteorDropStan Stateを取得（MeteorDrop中の居合スタン: 2sec）.
+    public EnemInterruptState_MeteorDropStan_Wendig GetMeteorDropStanState()
+    {
+        return meteorDropStanState;
     }
 
     // Bayt Stateを取得.

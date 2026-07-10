@@ -146,6 +146,27 @@ namespace InGame.Player
         }
 
         /// <summary>
+        /// 居合発動時: 0~100を25刻みで次の閾値へ上昇.
+        /// 0~24→25, 25~49→50, 50~74→75, 75~99→100.
+        /// 100以上は変動なし.
+        /// </summary>
+        public void OnIaiActivated()
+        {
+            float current = pulseGauge.Value;
+            if (current >= 100f) return;
+
+            // ceil to next multiple of 25.
+            float next = Mathf.Ceil((current + 0.001f) / 25f) * 25f;
+            next = Mathf.Min(next, 100f);
+            if (next > current)
+            {
+                pulseGauge.Value = next;
+                OnPulseIncreased();
+                Debug.Log($"[PulseModel] OnIaiActivated: {current:F1} → {pulseGauge.Value:F1}");
+            }
+        }
+
+        /// <summary>
         /// 居合ボタン長押し: 秒間0.5減少.
         /// </summary>
         /// <param name="deltaTime">経過時間.</param>

@@ -37,8 +37,10 @@ public class EnemyPresenter_Wendig : EnemyPresenter_abstract
         seRegistry.Register("Stan", "SE_Stan");
         seRegistry.Register("AttackPre", "SE_AttackPre");
         seRegistry.Register("AttackPreUnparryable", "SE_Parry_Fail");
+        seRegistry.Register("BerserkTransition", "SE_BerserkHowling");
+        seRegistry.Register("MeteorDrop", "SE_MeteorDrop");
 
         // AudioClip読み込み（SE未登録の場合は警告が出るが処理は継続）.
-        await sePlayer.LoadClipsAsync("SE_Stan", "SE_AttackPre", "SE_Parry_Fail");
+        await sePlayer.LoadClipsAsync("SE_Stan", "SE_AttackPre", "SE_Parry_Fail", "SE_BerserkHowling", "SE_MeteorDrop");
     }
 }

@@ -18,13 +18,23 @@ public class EnemyAttackHitDetector : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        ProcessTriggerHit(other);
+    }
+
+    // コライダー生成時にプレイヤーが既に重なっている場合、
+    // OnTriggerEnter2Dが発火しないためOnTriggerStay2Dでも検出する.
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        ProcessTriggerHit(other);
+    }
+
+    private void ProcessTriggerHit(Collider2D other)
+    {
         // 対象のコライダーからのヒットかチェック.
         if (colliderState == null || targetColliders == null) return;
 
         // プレイヤータグをチェック.
         if (!other.CompareTag("Player")) return;
-
-        //Debug.Log($"[EnemyAttackHitDetector] OnTriggerEnter2D - {other.gameObject.name}");
 
         // 攻撃者のTransformを設定（エネミーの向き判定用）.
         colliderState.SetAttackerTransform(transform);

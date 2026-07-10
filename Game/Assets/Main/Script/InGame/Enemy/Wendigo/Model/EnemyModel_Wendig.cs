@@ -58,6 +58,9 @@ public class EnemyModel_Wendig : EnemyModel_abstract
     public override void EnemAIStop()
     {
         Debug.Log($"[EnemyModel_Wendig] EnemAIStop - {gameObject.name}");
+        // 実行中の大技を中断（死亡時にジャンプし続ける問題を防止）.
+        AbortMeteorDrop();
+        AbortJumpSlash();
         AIModel.StopLoop();
     }
 
@@ -74,6 +77,13 @@ public class EnemyModel_Wendig : EnemyModel_abstract
     {
         Debug.Log($"[EnemyModel_Wendig] TriggerStan - {gameObject.name}");
         await AIModel.InterruptStateList.ExecuteInterrupt(AIModel.InterruptStateList.GetStanState(), this);
+    }
+
+    // 回避パリィスタン割り込みStateを実行（1sec、怒り行動は再開される）.
+    public async UniTask TriggerParryStan()
+    {
+        Debug.Log($"[EnemyModel_Wendig] TriggerParryStan - {gameObject.name}");
+        await AIModel.InterruptStateList.ExecuteInterrupt(AIModel.InterruptStateList.GetParryStanState(), this);
     }
 
     // 回避居合いスタン割り込みStateを実行（0.5sec短スタン）.
@@ -102,6 +112,27 @@ public class EnemyModel_Wendig : EnemyModel_abstract
     {
         Debug.Log($"[EnemyModel_Wendig] TriggerTripleAttack - {gameObject.name}");
         await AIModel.TripleAttackState.Act(this);
+    }
+
+    // JumpSlash中断（死亡時: State中断）.
+    public void AbortJumpSlash()
+    {
+        Debug.Log($"[EnemyModel_Wendig] AbortJumpSlash - {gameObject.name}");
+        AIModel.JumpSlashState.RequestAbort();
+    }
+
+    // MeteorDrop中断（居合ヒット時: State中断）.
+    public void AbortMeteorDrop()
+    {
+        Debug.Log($"[EnemyModel_Wendig] AbortMeteorDrop - {gameObject.name}");
+        AIModel.MeteorDropState.RequestAbort();
+    }
+
+    // MeteorDrop用2secスタン割り込みStateを実行.
+    public async UniTask TriggerMeteorDropStan()
+    {
+        Debug.Log($"[EnemyModel_Wendig] TriggerMeteorDropStan - {gameObject.name}");
+        await AIModel.InterruptStateList.ExecuteInterrupt(AIModel.InterruptStateList.GetMeteorDropStanState(), this);
     }
 
     // MeteorDrop Stateを実行.

@@ -43,6 +43,10 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
     // 怒りMeteorDrop予約.
     private bool pendingMeteorDrop = false;
 
+    // MeteorDrop抽選クールダウン（実行後一定時間は抽選されない）.
+    private float lastMeteorDropTime = -100f;
+    private const float meteorDropLotteryCooldown = 10f;
+
     // カメラ範囲設定.
     private float cameraViewRangeX = 8f;
     private float cameraViewRangeY = 5f;
@@ -107,20 +111,52 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
         currentActionSetting = null;
         aiStartTime = Time.time;
         lastRushEndTime = -100f;
-        pendingMeteorDrop = false;
+        pendingMeteorDrop = true; // 暴走突入時にMeteorDrop(大技)を必ず使用.
+        lastMeteorDropTime = -100f;
         meleeAttacksSinceLastRush = 0;
         lastMeleeAttackType = -1;
         // 怒りゲージリセット.
         angerGauge = 0f;
         isAngry = false;
+        // MeteorDropアクション設定を第二形態で有効化.
+        foreach (var setting in masterAI.ActionSettings)
+        {
+            if (setting.actionState is EnemState_Wendig_MeteorDrop)
+            {
+                setting.shouldActivate = true;
+                Debug.Log($"[WendigBerserkUpdater] MeteorDropアクション設定を有効化");
+            }
+        }
+
         Debug.Log($"[WendigBerserkUpdater] OnUpdateStart - 全状態リセット完了");
 
-        // 暴走開始時の演出（Howling）.
+        // 暴走開始時の演出（Howlingアニメーションのみ + 専用SE、攻撃判定なし）.
         if (ownerModel is EnemyModel_Wendig wendigModel)
         {
-            Debug.Log($"[WendigBerserkUpdater] ★暴走開始 → Howling演出★");
-            await wendigModel.TriggerHowling();
+            Debug.Log($"[WendigBerserkUpdater] ★暴走開始 → Howling演出 + 専用SE → MeteorDrop予約済★");
+
+            // Howlingアニメーショントリガーのみ（TriggerHowling()は使わない）.
+            var anim = ownerModel.Animator;
+            if (anim != null)
+            {
+                anim.SetTrigger("Howling");
+            }
+
+            // 第二形態移行専用SE再生.
+            ownerModel.Presenter?.PlaySE("BerserkTransition");
+
+            // Howlingアニメーション表示待ち.
+            await UniTask.Delay(1200);
+
+            // Howlingアニメーション終了.
+            if (anim != null)
+            {
+                anim.SetTrigger("Howling_End");
+            }
         }
+
+        // 第二形態: 常時赤色に変化.
+        ApplyBerserkTint();
 
         // 初期速度修正適用.
         ApplyCurrentSpeedModifier();
@@ -130,6 +166,9 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
     protected override async UniTask OnUpdateLoop(CancellationToken token)
     {
+        // 割り込み（スタン等）実行中は行動しない.
+        if (WendigMasterAI.InterruptStateList.IsInterrupting) return;
+
         WendigMasterAI.EnsureInitialized();
 
         if (aiStartTime < 0f)
@@ -295,6 +334,22 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
         {
             currentActionSetting = selectedSetting;
 
+            // MeteorDrop（大技）が抽選された場合.
+            if (selectedSetting.actionState is EnemState_Wendig_MeteorDrop && ownerModel is EnemyModel_Wendig wendigModelMeteor)
+            {
+                Debug.Log($"[WendigBerserkUpdater] ★MeteorDrop抽選実行★");
+                if (wendigModelMeteor.Presenter is { } presenterMD)
+                    presenterMD.IsAngerAction = true;
+                await wendigModelMeteor.TriggerMeteorDrop();
+                if (wendigModelMeteor.Presenter is { } presenterMDEnd)
+                    presenterMDEnd.IsAngerAction = false;
+                selectedSetting.ConsumeRepeat();
+                lastMeteorDropTime = Time.time;
+                randomMoveCount = 0;
+                currentActionSetting = null;
+                return;
+            }
+
             if (selectedSetting.actionState is EnemState_Wendig_JumpSlash jumpSlash)
             {
                 jumpSlash.SetTargetPosition(targetPos);
@@ -434,7 +489,13 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
         if (ownerModel is EnemyModel_Wendig wendigModelAnger)
         {
             Debug.Log($"[WendigBerserkUpdater] ★MeteorDrop実行★");
+            // 怒り行動フラグをセット（Iai時に2secスタン判定用）.
+            if (wendigModelAnger.Presenter is { } presenterB)
+                presenterB.IsAngerAction = true;
             await wendigModelAnger.TriggerMeteorDrop();
+            if (wendigModelAnger.Presenter is { } presenterBEnd)
+                presenterBEnd.IsAngerAction = false;
+            lastMeteorDropTime = Time.time;
         }
         currentState = BerserkState.Idle;
     }
@@ -544,6 +605,12 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
             if (setting.actionState is EnemState_Wendig_MeleeAttack)
             {
                 if (randomMoveCount < effectiveMinMelee) continue;
+            }
+
+            // MeteorDropクールダウン: 実行後一定時間は抽選対象外.
+            if (setting.actionState is EnemState_Wendig_MeteorDrop)
+            {
+                if (Time.time - lastMeteorDropTime < meteorDropLotteryCooldown) continue;
             }
 
             float weight = setting.activationWeight;

@@ -76,6 +76,8 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
     // SE再生用.
     protected SEClipRegistry seRegistry;
     protected SEPlayer sePlayer;
+    /// <summary>SE初期化完了フラグ.</summary>
+    public bool IsSEReady { get; private set; }
 
     /// <summary>
     /// SE初期化（派生クラスでオーバーライド）.
@@ -85,6 +87,15 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
         seRegistry = new SEClipRegistry();
         sePlayer = SEPlayer.Create($"{gameObject.name}_SE");
         await UniTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// SE初期化を実行し、完了フラグをセット.
+    /// </summary>
+    private async UniTaskVoid InitializeSEAndMarkReady()
+    {
+        await InitializeSE();
+        IsSEReady = true;
     }
 
     /// <summary>
@@ -107,6 +118,10 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
     public bool IsCurrentAttackParryable { get; private set; }
     /// <summary>突進中フラグ（Rush stateからセット）.</summary>
     public bool IsRushing { get; set; }
+    /// <summary>怒り時専用行動中フラグ（AIUpdaterからセット）.</summary>
+    public bool IsAngerAction { get; set; }
+    /// <summary>MeteorDrop（大技）実行中フラグ.</summary>
+    public bool IsMeteorDropActive { get; set; }
 
     /// <summary>攻撃タイミングフラグをリセット.</summary>
     public void ClearAttackImminent()
@@ -174,8 +189,8 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
 
         Debug.Log($"[EnemyPresenter_abstract] Awake完了 - {gameObject.name}");
 
-        // SE初期化.
-        InitializeSE().Forget();
+        // SE初期化（完了後にIsSEReady=trueになる）.
+        InitializeSEAndMarkReady().Forget();
 
         // EnemyUIViewのsetterがnullでなくなったらEnemyNameをセット.
         WaitAndSetEnemyName().Forget();

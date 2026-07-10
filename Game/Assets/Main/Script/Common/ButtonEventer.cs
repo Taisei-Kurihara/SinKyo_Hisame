@@ -51,6 +51,11 @@ namespace Common
         private float navigateCooldown = 0.2f;
         private float lastNavigateTime = 0f;
 
+        // 選択中ボタンの明度パルス.
+        private float blinkTimer = 0f;
+        private const float blinkSpeed = 3f;        // パルス周波数.
+        private const float blinkMinBrightness = 0.6f; // 最低明度.
+
         private CompositeDisposable disposables = new CompositeDisposable();
 
         //ボタン専用の
@@ -92,6 +97,24 @@ namespace Common
         public void Update()
         {
             CursolUpdate();
+            UpdateSelectedBlink();
+        }
+
+        /// <summary>
+        /// 選択中ボタンの明度パルスアニメーション.
+        /// </summary>
+        private void UpdateSelectedBlink()
+        {
+            if (previousButton == null) return;
+            blinkTimer += Time.unscaledDeltaTime * blinkSpeed;
+            // sin波で明度を 1.0 〜 blinkMinBrightness の間で変化.
+            float t = (Mathf.Sin(blinkTimer * Mathf.PI * 2f) + 1f) * 0.5f;
+            float brightness = Mathf.Lerp(blinkMinBrightness, 1f, t);
+            var img = previousButton.GetComponent<UnityEngine.UI.Image>();
+            if (img != null)
+            {
+                img.color = new Color(brightness, brightness, brightness, 1f);
+            }
         }
 
 
@@ -168,6 +191,7 @@ namespace Common
 
             if (action.UI.Submit.WasPressedThisFrame())
             {
+                OnButtonSubmitted(buttons[currentIndex_y][currentIndex_x]);
                 //クールタイム処理(共通）
                 buttonsCoolTime.SetTime(TimeSpan.FromSeconds(1f)).LinkTo(gameObject)
                     .OnStart(() => ButtonEvents(buttons[currentIndex_y][currentIndex_x]))
@@ -175,6 +199,16 @@ namespace Common
             }
         }
 
+
+        /// <summary>
+        /// ボタン選択変更時のコールバック（SE等に使用）.
+        /// </summary>
+        protected virtual void OnButtonSelected(Button button) { }
+
+        /// <summary>
+        /// ボタン決定時のコールバック（SE等に使用）.
+        /// </summary>
+        protected virtual void OnButtonSubmitted(Button button) { }
 
         /// <summary>
         /// ここでボタンが選ばれた時、という処理
@@ -190,7 +224,16 @@ namespace Common
                 {
                     prevAnimator.SetTrigger(Normal);
                 }
+                // 明度を元に戻す.
+                var prevImg = previousButton.GetComponent<UnityEngine.UI.Image>();
+                if (prevImg != null)
+                {
+                    prevImg.color = Color.white;
+                }
             }
+
+            // 点滅タイマーリセット.
+            blinkTimer = 0f;
 
             // 現在のボタンを選択状態に
             EventSystem.current.SetSelectedGameObject(button.gameObject);
@@ -204,6 +247,9 @@ namespace Common
 
             // 次回のために記録
             previousButton = button;
+
+            // SE等のコールバック.
+            OnButtonSelected(button);
         }
 
 
@@ -235,10 +281,16 @@ namespace Common
                         {
                             Animator animator = button.GetComponent<Animator>();
                             animator.SetTrigger(Normal);
+                            // 明度を元に戻す.
+                            var img = button.GetComponent<UnityEngine.UI.Image>();
+                            if (img != null) img.color = Color.white;
                         }
                     }
                 }
                 animator.SetTrigger(Highlighted);
+                // 点滅対象を更新.
+                previousButton = target;
+                blinkTimer = 0f;
             });
             trigger.triggers.Add(entryEnter);
 

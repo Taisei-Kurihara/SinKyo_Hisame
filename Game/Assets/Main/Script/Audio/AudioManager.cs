@@ -41,6 +41,15 @@ namespace Setting
             Bgm.SetAudioSource(volume);
         }
 
+        /// <summary>
+        /// BGM音量に心拍数連動の倍率を適用（0.0～1.0）.
+        /// 基本音量に対してこの倍率を掛ける.
+        /// </summary>
+        public void SetBgmHeartRateMultiplier(float multiplier)
+        {
+            Bgm.SetHeartRateMultiplier(multiplier);
+        }
+
         public void StopBgm()
         {
             Bgm.Stop().Forget();
@@ -69,10 +78,28 @@ public class AudioTokenPackage
     private CancellationTokenSource token;
     AsyncOperationHandle<AudioClip> handle;
 
+    // 基本音量（SetAudioSourceで設定された値）.
+    private float baseVolume = 1f;
+    // 心拍数連動の音量倍率.
+    private float heartRateMultiplier = 1f;
+
     public void SetAudioSource(int num)
     {
         // 音量を0～100の整数からfloat(0.0～1.0)に変換.
-        audioSource.volume = Mathf.Clamp01(num / 100f);
+        baseVolume = Mathf.Clamp01(num / 100f);
+        ApplyVolume();
+    }
+
+    /// <summary>心拍数連動の音量倍率を設定（0.0～1.0）.</summary>
+    public void SetHeartRateMultiplier(float multiplier)
+    {
+        heartRateMultiplier = Mathf.Clamp01(multiplier);
+        ApplyVolume();
+    }
+
+    private void ApplyVolume()
+    {
+        audioSource.volume = baseVolume * heartRateMultiplier;
     }
 
     public void LoopOnOff(bool onoff)

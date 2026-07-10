@@ -461,7 +461,8 @@ namespace InGame.Player
             }
 
             // Platform上にいて下方向に落下中または静止中の場合、落下を無効化.
-            if (platformDetector.IsOnPlatform && rigidbody.linearVelocity.y <= 0f)
+            // ただし回避中はクランプをスキップ（MovePositionによる移動を妨げないため）.
+            if (platformDetector.IsOnPlatform && rigidbody.linearVelocity.y <= 0f && !isDodgeInvincible)
             {
                 rigidbody.linearVelocity = new Vector2(rigidbody.linearVelocity.x, 0f);
 

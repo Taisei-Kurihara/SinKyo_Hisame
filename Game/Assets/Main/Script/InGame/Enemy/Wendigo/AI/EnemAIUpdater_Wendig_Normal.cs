@@ -109,6 +109,9 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
 
     protected override async UniTask OnUpdateLoop(CancellationToken token)
     {
+        // 割り込み（スタン等）実行中は行動しない.
+        if (WendigMasterAI.InterruptStateList.IsInterrupting) return;
+
         // 初期化.
         WendigMasterAI.EnsureInitialized();
 
@@ -338,7 +341,12 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
         if (ownerModel is EnemyModel_Wendig wendigModelAnger)
         {
             Debug.Log($"[WendigNormalUpdater] ★怒りHowling実行開始★");
+            // 怒り行動フラグをセット（Iai時に2secスタン判定用）.
+            if (wendigModelAnger.Presenter is { } presenterN)
+                presenterN.IsAngerAction = true;
             await wendigModelAnger.TriggerHowling();
+            if (wendigModelAnger.Presenter is { } presenterNEnd)
+                presenterNEnd.IsAngerAction = false;
         }
         currentState = UpdaterState.Idle;
     }

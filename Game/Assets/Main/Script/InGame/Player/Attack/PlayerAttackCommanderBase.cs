@@ -253,6 +253,18 @@ namespace InGame.Player
             seRegistry?.Clear();
             seRegistry = null;
         }
+
+        /// <summary>
+        /// Zanエフェクトを強制非表示にする（回避・ジャンプ等でアニメーションキャンセル時に呼び出す）.
+        /// </summary>
+        public void ForceHideZanEffect()
+        {
+            if (playerModel == null) return;
+            var avator = playerModel.GetAvator();
+            if (avator == null) return;
+            var zanController = avator.GetComponentInChildren<ZanHitController>(true);
+            if (zanController != null) zanController.Hide();
+        }
     }
 
     /// <summary>
@@ -681,6 +693,15 @@ namespace InGame.Player
             var statusModel = PlayerManager.Instance().playerStatusModel;
             float damage = statusModel.strength * statusModel.strengthRate * attackMultiplier;
 
+            // 心拍数100以下で攻撃力ボーナス (最大50%アップ at pulse=0).
+            float currentPulse = PlayerManager.Instance().pulseModel.GetPulseGauge();
+            if (currentPulse < 100f)
+            {
+                float reduction = 100f - currentPulse;
+                float pulseBonus = Mathf.Min(0.5f, reduction * 0.005f);
+                damage *= (1f + pulseBonus);
+            }
+
             // 攻撃振りSE再生（攻撃開始時）.
             PlaySE("AttackSwing");
 
@@ -774,6 +795,15 @@ namespace InGame.Player
                 : attackMultipliers[0];
             float damage = statusModel.strength * statusModel.strengthRate * multiplier;
 
+            // 心拍数100以下で攻撃力ボーナス (最大50%アップ at pulse=0).
+            float currentPulse = PlayerManager.Instance().pulseModel.GetPulseGauge();
+            if (currentPulse < 100f)
+            {
+                float reduction = 100f - currentPulse;
+                float pulseBonus = Mathf.Min(0.5f, reduction * 0.005f);
+                damage *= (1f + pulseBonus);
+            }
+
             // 攻撃振りSE再生（攻撃開始時）.
             PlaySE("AttackSwing");
 
@@ -830,8 +860,9 @@ namespace InGame.Player
         private float duration = 0.4f;
 
         /// <summary>
-        /// 居合ダメージ計算: 基礎攻撃力 × (1 + 鼓動ボーナス).
+        /// 居合ダメージ計算: 基礎攻撃力 × (1 + 鼓動ボーナス) × 高心拍ペナルティ.
         /// 鼓動ボーナス = min(2.5, max(0, (100 - 現在鼓動) × 0.025)).
+        /// 高心拍ペナルティ = 心拍100以上で段階的に減少（100→1.0, 200→0.5）.
         /// </summary>
         private float CalculateIaiDamage()
         {
@@ -843,8 +874,17 @@ namespace InGame.Player
             float pulseReduction = Mathf.Max(0f, 100f - currentPulse);
             float bonusMultiplier = Mathf.Min(2.5f, pulseReduction * 0.025f);
 
-            // 基礎攻撃力に上乗せ (加算式) × 居合ダメージ倍率3倍.
-            return baseAttack * (1f + bonusMultiplier) * 3f;
+            // 高心拍ペナルティ: 心拍100以上で段階的に攻撃力減少.
+            // 100→1.0倍, 150→0.75倍, 200→0.5倍（線形補間）.
+            float highPulsePenalty = 1f;
+            if (currentPulse >= 100f)
+            {
+                float overPulse = Mathf.Clamp(currentPulse - 100f, 0f, 100f);
+                highPulsePenalty = Mathf.Lerp(1f, 0.5f, overPulse / 100f);
+            }
+
+            // 基礎攻撃力に上乗せ (加算式) × 居合ダメージ倍率3倍 × 高心拍ペナルティ.
+            return baseAttack * (1f + bonusMultiplier) * 3f * highPulsePenalty;
         }
 
         public override bool CanExecute()
@@ -888,6 +928,15 @@ namespace InGame.Player
                     // 居合ヒット時: 吸収ゲージポイント10付与.
                     var drainModel = PlayerManager.Instance().drainModel;
                     drainModel?.Increment(10);
+
+                    // 居合ヒット時: MeteorDrop中なら2secスタン + 無敵削除 + 大技中断.
+                    var iaiEnemy = UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>();
+                    if (iaiEnemy != null && iaiEnemy.IsMeteorDropActive && iaiEnemy.Model is EnemyModel_Wendig iaiWendigModel)
+                    {
+                        iaiWendigModel.AbortMeteorDrop();
+                        iaiWendigModel.TriggerMeteorDropStan().Forget();
+                        UnityEngine.Debug.Log("[IaiAttack] 居合ヒット → MeteorDrop中: 2secスタン + 無敵削除 + 大技中断");
+                    }
                 },
                 attackType: PlayerAttackType.Iai
             );

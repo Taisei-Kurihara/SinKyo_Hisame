@@ -15,6 +15,12 @@ public abstract class EnemyStatus_abstract : MonoBehaviour
     protected virtual ChangeHP defaultDamage { get; set; } = new ChangeHP_Damage_Default();
     protected virtual ChangeHP defaultHeal { get; set; } = new ChangeHP_Heal_Default();
 
+    // Dead処理の二重実行防止フラグ.
+    private bool isDead = false;
+
+    /// <summary>Dead処理が開始済みかどうか.</summary>
+    public bool IsDead => isDead;
+
     public abstract void Init();
 
     private void Awake()
@@ -62,8 +68,23 @@ public abstract class EnemyStatus_abstract : MonoBehaviour
         Debug.Log($"[EnemyStatus_abstract] OnHeal完了 - 残りHP: {hp.Value}");
     }
 
+    /// <summary>
+    /// 外部からHP状態を確認し、HP <= 0 かつ未処理なら死亡処理を実行する.
+    /// ReactiveProperty監視に加え、明示的な確認用.
+    /// </summary>
+    public void CheckDeadCondition()
+    {
+        if (!isDead && hp.Value <= 0)
+        {
+            Debug.Log($"[EnemyStatus_abstract] CheckDeadCondition - HP <= 0 検知、Dead処理実行 - {gameObject.name}");
+            Dead().Forget();
+        }
+    }
+
     protected virtual async UniTask Dead()
     {
+        if (isDead) return;
+        isDead = true;
         Debug.Log($"[EnemyStatus_abstract] Dead開始 - {gameObject.name}");
         await DeadAnim();
         Debug.Log($"[EnemyStatus_abstract] DeadAnim完了");

@@ -41,6 +41,8 @@ namespace Common
         // --- 心拍数連動ズーム ---
         private float heartRateZoomTarget = 1f;  // 1 = 通常, <1 = ズームイン.
         private float heartRateZoomCurrent = 1f;
+        // ZoomTo実行中フラグ（heartRateZoomを抑制）.
+        private bool isExplicitZoomActive = false;
         private float baseOrthoSize = -1f;
         private float baseFOV = -1f;
         private const float heartRateZoomSmoothRate = 3f;
@@ -227,6 +229,23 @@ namespace Common
 
         public Transform GetFollowTarget() => followerObject;
 
+        /// <summary>
+        /// 追従対象の位置にカメラを即座にスナップする.
+        /// シェイク原点も更新するため、スナップ後のシェイクが正しい位置を基準にする.
+        /// </summary>
+        public void SnapToFollowTarget()
+        {
+            if (mainCamera == null || followerObject == null) return;
+            Vector3 targetPos = followerObject.position + offset;
+            if (hasBounds && heartRateZoomTarget >= 1f)
+            {
+                targetPos.x = Mathf.Clamp(targetPos.x, boundsMinX, boundsMaxX);
+                targetPos.y = Mathf.Clamp(targetPos.y, boundsMinY, boundsMaxY);
+            }
+            mainCamera.transform.position = targetPos;
+            initialLocalPos = mainCamera.transform.localPosition;
+        }
+
         public void EnableFollow() => isFollowing = true;
         public void DisableFollow() => isFollowing = false;
         public void ToggleFollow() => isFollowing = !isFollowing;
@@ -298,7 +317,10 @@ namespace Common
             // 揺れパラメータ決定
             float d = (duration > 0f) ? duration : defaultShakeDuration;
             float m = (magnitude > 0f) ? magnitude : defaultShakeMagnitude;
-            Vector3 dir = (direction ?? defaultShakeDirection).normalized;
+            Vector3 rawDir = direction ?? defaultShakeDirection;
+            // normalize前に Vector3.one 判定（normalize後だと (0.577,0.577,0.577) になり一致しない）.
+            bool useRandomXY = rawDir == Vector3.one;
+            Vector3 dir = rawDir.normalized;
 
             try
             {
@@ -307,13 +329,12 @@ namespace Common
                 while (elapsed < d)
                 {
                     float progress = elapsed / d;
-                    float damping = 1f - progress; // 終盤に揺れを弱くする
+                    float damping = 1f - progress; // 終盤に揺れを弱くする.
 
                     Vector3 randomOffset;
 
-                    // 方向指定あり → その方向ベースで揺れる
-                    // Vector3.one（デフォルト）ならランダムXY方向揺れ
-                    if (dir == Vector3.one)
+                    // Vector3.one（デフォルト）ならランダムXY方向揺れ.
+                    if (useRandomXY)
                     {
                         float x = Random.Range(-1f, 1f) * m * damping;
                         float y = Random.Range(-1f, 1f) * m * damping;
@@ -321,7 +342,7 @@ namespace Common
                     }
                     else
                     {
-                        // 指定方向 ± に沿って揺れる
+                        // 指定方向 ± に沿って揺れる.
                         float sign = Random.Range(0, 2) == 0 ? -1f : 1f;
                         randomOffset = dir * m * damping * sign;
                     }
@@ -407,6 +428,7 @@ namespace Common
             if (mainCamera == null) return;
 
             StopZoom();
+            isExplicitZoomActive = true;
 
             zoomCTS = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
             var token = zoomCTS.Token;
@@ -442,6 +464,7 @@ namespace Common
             catch (OperationCanceledException) { }
             finally
             {
+                isExplicitZoomActive = false;
                 zoomCTS?.Dispose();
                 zoomCTS = null;
             }
@@ -454,6 +477,15 @@ namespace Common
         {
             if (zoomCTS != null && !zoomCTS.IsCancellationRequested)
                 zoomCTS.Cancel();
+        }
+
+        /// <summary>
+        /// 心拍数連動ズームの抑制を手動で設定.
+        /// 勝利演出後など、ズーム値を維持したい場合にtrueを設定する.
+        /// </summary>
+        public void SetZoomLock(bool locked)
+        {
+            isExplicitZoomActive = locked;
         }
 
         /// <summary>
@@ -502,6 +534,8 @@ namespace Common
         private void ApplyHeartRateZoom(float dt)
         {
             if (mainCamera == null) return;
+            // ZoomTo実行中は心拍ズームを抑制.
+            if (isExplicitZoomActive) return;
 
             // ベース値未設定なら現在値を保存.
             if (baseOrthoSize < 0f) baseOrthoSize = mainCamera.orthographicSize;

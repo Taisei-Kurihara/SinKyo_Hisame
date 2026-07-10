@@ -2,10 +2,12 @@ using InGame.Player;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using System.Collections.Generic;
 using System;
-#if UNITY_EDITOR
 using Cysharp.Threading.Tasks;
+#if UNITY_EDITOR
 using InGame.Common;
 #endif
 
@@ -64,12 +66,42 @@ namespace InGame.Player
         private float overlayCurrentTiling = 0f;
         private float overlayTargetSpeed = 4f;
         private float overlayCurrentSpeed = 4f;
-        private float overlayTargetAmplitude = 0.14f;
-        private float overlayCurrentAmplitude = 0.14f;
+        private float overlayTargetAmplitude = 0.07f;
+        private float overlayCurrentAmplitude = 0.07f;
         private Color overlayTargetColor = new Color(0f, 0f, 0f, 0f);
         private Color overlayCurrentColor = new Color(0f, 0f, 0f, 0f);
         private float overlayPhase = 0f;
         private const float overlaySmoothRate = 3f;
+
+        [Header("血管エフェクト（高心拍数時）")]
+        [SerializeField] private Material bloodVesselsMaterial;
+
+        private float bloodVesselsTargetAlpha = 0f;
+        private float bloodVesselsCurrentAlpha = 0f;
+
+        // ---- 心音オーディオ（AudioSource 2つでクロスフェード切り替え） ----
+        [Header("心音オーディオ")]
+        [SerializeField] private string heartbeatSlowClipAddress = "SE_Heartbeat_Slow";
+        [SerializeField] private string heartbeatFastClipAddress = "SE_Heartbeat_Fast";
+        private AudioSource heartbeatSourceA;
+        private AudioSource heartbeatSourceB;
+        private bool heartbeatUsingA = true; // 現在Aが再生中.
+        private AudioClip heartbeatSlowClip;
+        private AudioClip heartbeatFastClip;
+        private AsyncOperationHandle<AudioClip> heartbeatSlowHandle;
+        private AsyncOperationHandle<AudioClip> heartbeatFastHandle;
+        private bool heartbeatClipLoaded = false;
+        private bool heartbeatIsFast = false; // 現在Fastクリップを使用中.
+        private const int heartbeatSwitchThreshold = 160; // Slow/Fast切り替え閾値.
+
+        // 心音パラメータ（心拍数から算出）.
+        private float heartbeatTargetVolume = 0f;
+        private float heartbeatCurrentVolume = 0f;
+        private const float heartbeatSmoothRate = 3f;
+        // クロスフェード中フラグ.
+        private bool heartbeatCrossfading = false;
+        private float crossfadeProgress = 0f;
+        private const float crossfadeDuration = 0.5f;
 
         [Header("ブラー制御（心拍数連動）")]
         [SerializeField] private List<Material> blurMaterials = new();
@@ -112,6 +144,55 @@ namespace InGame.Player
             if (dpsText != null)
             {
                 dpsText.gameObject.SetActive(false);
+            }
+
+            // 心音AudioSource 2つを生成.
+            heartbeatSourceA = gameObject.AddComponent<AudioSource>();
+            heartbeatSourceA.playOnAwake = false;
+            heartbeatSourceA.loop = true;
+            heartbeatSourceA.volume = 0f;
+
+            heartbeatSourceB = gameObject.AddComponent<AudioSource>();
+            heartbeatSourceB.playOnAwake = false;
+            heartbeatSourceB.loop = true;
+            heartbeatSourceB.volume = 0f;
+
+            // 心音クリップをAddressablesから非同期ロード.
+            LoadHeartbeatClipAsync().Forget();
+        }
+
+        private async UniTaskVoid LoadHeartbeatClipAsync()
+        {
+            try
+            {
+                // Slow/Fast 2つのクリップを並列ロード.
+                heartbeatSlowHandle = Addressables.LoadAssetAsync<AudioClip>(heartbeatSlowClipAddress);
+                heartbeatFastHandle = Addressables.LoadAssetAsync<AudioClip>(heartbeatFastClipAddress);
+
+                heartbeatSlowClip = await heartbeatSlowHandle;
+                heartbeatFastClip = await heartbeatFastHandle;
+
+                bool slowOk = heartbeatSlowHandle.Status == AsyncOperationStatus.Succeeded && heartbeatSlowClip != null;
+                bool fastOk = heartbeatFastHandle.Status == AsyncOperationStatus.Succeeded && heartbeatFastClip != null;
+
+                if (slowOk && fastOk)
+                {
+                    heartbeatClipLoaded = true;
+                    // 初期状態はSlow.
+                    heartbeatIsFast = false;
+                    heartbeatSourceA.clip = heartbeatSlowClip;
+                    heartbeatSourceB.clip = heartbeatSlowClip;
+                    Debug.Log($"[PlayerView] 心音クリップ Slow/Fast ロード完了");
+                }
+                else
+                {
+                    if (!slowOk) Debug.LogWarning($"[PlayerView] 心音クリップ '{heartbeatSlowClipAddress}' ロード失敗");
+                    if (!fastOk) Debug.LogWarning($"[PlayerView] 心音クリップ '{heartbeatFastClipAddress}' ロード失敗");
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PlayerView] 心音クリップロード例外: {e.Message}");
             }
         }
 
@@ -184,6 +265,17 @@ namespace InGame.Player
                 DeathManager.Instance.DebugReset();
                 DeathManager.Instance.NotifyEnemyDeath().Forget();
             }
+            // デバッグ: Zキーで EnemyのHPを半分にする.
+            if (Input.GetKeyDown(KeyCode.Z))
+            {
+                var enemyPresenter = UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>();
+                if (enemyPresenter != null && enemyPresenter.Status != null)
+                {
+                    float halfHp = enemyPresenter.Status.hp.Value * 0.5f;
+                    enemyPresenter.Status.OnDamaged(halfHp).Forget();
+                    Debug.Log($"[PlayerView] デバッグ: Enemy HP半分 ({enemyPresenter.Status.hp.Value} → {enemyPresenter.Status.hp.Value - halfHp})");
+                }
+            }
 #endif
 
             // HPゲージを0.5秒かけてシームレスに補間.
@@ -202,7 +294,8 @@ namespace InGame.Player
                 heartGage.fillAmount = currentHeartFill;
             }
 
-            // オーバーレイ脈動アニメーション（全パラメータを滑らかに補間）.
+            // オーバーレイ脈動アニメーション
+            // （全パラメータを滑らかに補間）.
             {
                 var mat = GetOverlapMaterial();
                 if (mat != null)
@@ -229,15 +322,23 @@ namespace InGame.Player
                 blurCurrentSize = Mathf.Lerp(blurCurrentSize, blurTargetSize, s2);
                 blurCurrentAlpha = Mathf.Lerp(blurCurrentAlpha, blurTargetAlpha, s2);
 
-                for (int i = 0; i < blurMaterials.Count; i++)
-                {
-                    if (blurMaterials[i] != null)
-                    {
-                        blurMaterials[i].SetFloat("_BlurSize", blurCurrentSize);
-                        blurMaterials[i].SetFloat("_BlurAlpha", blurCurrentAlpha);
-                    }
-                }
+                Shader.SetGlobalFloat("_BlurSize", blurCurrentSize);
+                Shader.SetGlobalFloat("_BlurAlpha", blurCurrentAlpha);
             }
+
+            // 血管エフェクト _FadeAlpha を滑らかに補間・適用.
+            if (bloodVesselsMaterial != null)
+            {
+                float s3 = 1f - Mathf.Exp(-overlaySmoothRate * Time.deltaTime);
+                bloodVesselsCurrentAlpha = Mathf.Lerp(bloodVesselsCurrentAlpha, bloodVesselsTargetAlpha, s3);
+                // ターゲットが0のとき、補間の残留値を完全にカット.
+                if (bloodVesselsTargetAlpha <= 0f && bloodVesselsCurrentAlpha < 0.05f)
+                    bloodVesselsCurrentAlpha = 0f;
+                bloodVesselsMaterial.SetFloat("_FadeAlpha", bloodVesselsCurrentAlpha);
+            }
+
+            // ---- 心音オーディオ更新 ----
+            UpdateHeartbeatAudio();
 
             // Bキーで DPS表示の有効/無効を切り替え.
             if (Input.GetKeyDown(KeyCode.B))
@@ -397,7 +498,7 @@ namespace InGame.Player
                 hrAmplitude = 0.4f;
                 // HR 30→70 で speed 2→5.
                 float t = Mathf.InverseLerp(30f, 70f, overlayHeartRate);
-                hrSpeed = Mathf.Lerp(2f, 5f, t);
+                hrSpeed = Mathf.Lerp(2f, 4f, t);
             }
             else
             {
@@ -430,8 +531,37 @@ namespace InGame.Player
             overlayTargetSpeed = hrSpeed;
             overlayTargetAmplitude = hrAmplitude;
 
+            // ---- 血管エフェクト（HR 170→190 で alpha 0→0.999, 170未満は明示的に0）----
+            bloodVesselsTargetAlpha = overlayHeartRate < 170
+                ? 0f
+                : Mathf.InverseLerp(170f, 190f, overlayHeartRate) * 0.999f;
+
+            // ---- 心音パラメータ算出 ----
+            // volume: HR 100から離れるほど大きく（HR 0 or 200 で最大）.
+            // clip: HR < 160 → Slow, HR >= 160 → Fast（クロスフェードで切り替え）.
+            {
+                float distFrom100 = Mathf.Abs(overlayHeartRate - 100f) / 100f;
+                heartbeatTargetVolume = Mathf.Clamp01(distFrom100);
+            }
+
+            // ---- BGM音量（HR 90-110: 1.0, HR 50以下/150以上: 0.3）----
+            {
+                float bgmMul = 1f;
+                if (overlayHeartRate < 90)
+                {
+                    // HR 90→50 で 1.0→0.3.
+                    bgmMul = Mathf.Lerp(0.3f, 1f, Mathf.InverseLerp(50f, 90f, overlayHeartRate));
+                }
+                else if (overlayHeartRate > 110)
+                {
+                    // HR 110→150 で 1.0→0.3.
+                    bgmMul = Mathf.Lerp(1f, 0.3f, Mathf.InverseLerp(110f, 150f, overlayHeartRate));
+                }
+                Setting.AudioManager.Instance(false)?.SetBgmHeartRateMultiplier(bgmMul);
+            }
+
             // ---- ブラー制御（HR < 100 で 0→max, alpha 1→0.7）----
-            // ---- カメラズーム（HR < 100 でプレイヤー中心にズーム、端無視）----
+            // ---- カメラズーム（HR < 100 でプレイヤー中心にズーム、端無示）----
             if (overlayHeartRate < 100)
             {
                 float tBlur = Mathf.InverseLerp(100f, 30f, overlayHeartRate);
@@ -448,6 +578,94 @@ namespace InGame.Player
                 blurTargetAlpha = 1f;
                 global::Common.CameraManager.Instance(false)?.SetHeartRateZoom(1f);
             }
+        }
+
+        // ---- 心音オーディオ制御 ----
+
+        /// <summary>
+        /// 心音のvolume/pitchを滑らかに補間し、pitch変更時はクロスフェードで切り替える.
+        /// </summary>
+        private void UpdateHeartbeatAudio()
+        {
+            if (!heartbeatClipLoaded) return;
+
+            var activeSource = heartbeatUsingA ? heartbeatSourceA : heartbeatSourceB;
+            var inactiveSource = heartbeatUsingA ? heartbeatSourceB : heartbeatSourceA;
+
+            // volume補間.
+            float s = 1f - Mathf.Exp(-heartbeatSmoothRate * Time.deltaTime);
+            heartbeatCurrentVolume = Mathf.Lerp(heartbeatCurrentVolume, heartbeatTargetVolume, s);
+
+            // HR 160 を閾値に Slow/Fast クリップ切り替え（クロスフェード）.
+            bool shouldBeFast = overlayHeartRate >= heartbeatSwitchThreshold;
+            if (shouldBeFast != heartbeatIsFast && !heartbeatCrossfading)
+            {
+                // クロスフェード開始: inactive側に新クリップを設定して再生開始.
+                heartbeatCrossfading = true;
+                crossfadeProgress = 0f;
+                heartbeatIsFast = shouldBeFast;
+                inactiveSource.clip = shouldBeFast ? heartbeatFastClip : heartbeatSlowClip;
+                inactiveSource.volume = 0f;
+                if (!inactiveSource.isPlaying)
+                {
+                    inactiveSource.Play();
+                }
+            }
+
+            if (heartbeatCrossfading)
+            {
+                // クロスフェード進行.
+                crossfadeProgress += Time.deltaTime / crossfadeDuration;
+                float t = Mathf.Clamp01(crossfadeProgress);
+
+                activeSource.volume = heartbeatCurrentVolume * (1f - t);
+                inactiveSource.volume = heartbeatCurrentVolume * t;
+
+                if (t >= 1f)
+                {
+                    // クロスフェード完了: active/inactiveを入れ替え.
+                    activeSource.Stop();
+                    heartbeatUsingA = !heartbeatUsingA;
+                    heartbeatCrossfading = false;
+                }
+            }
+            else
+            {
+                // クロスフェード中でない: 通常のvolume更新.
+                activeSource.volume = heartbeatCurrentVolume;
+
+                // volume > 0 なら再生開始.
+                if (heartbeatCurrentVolume > 0.01f && !activeSource.isPlaying)
+                {
+                    activeSource.Play();
+                }
+                // volume ≈ 0 なら停止.
+                else if (heartbeatCurrentVolume <= 0.01f && activeSource.isPlaying)
+                {
+                    activeSource.Stop();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 心音を即座に停止（死亡時等）.
+        /// </summary>
+        public void StopHeartbeatAudio()
+        {
+            heartbeatTargetVolume = 0f;
+            heartbeatCurrentVolume = 0f;
+            heartbeatCrossfading = false;
+            if (heartbeatSourceA != null && heartbeatSourceA.isPlaying) heartbeatSourceA.Stop();
+            if (heartbeatSourceB != null && heartbeatSourceB.isPlaying) heartbeatSourceB.Stop();
+        }
+
+        private void OnDestroy()
+        {
+            // 心音クリップのAddressablesハンドルを解放.
+            if (heartbeatSlowHandle.IsValid())
+                Addressables.Release(heartbeatSlowHandle);
+            if (heartbeatFastHandle.IsValid())
+                Addressables.Release(heartbeatFastHandle);
         }
 
         // ---- DPS計測 ----

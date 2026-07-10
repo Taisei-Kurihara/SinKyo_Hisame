@@ -1,4 +1,5 @@
 using System.Threading;
+using Audio;
 using Common;
 using Cysharp.Threading.Tasks;
 using InGame.Enemy;
@@ -47,7 +48,7 @@ namespace SceneEventer
                     GameStart();
                     break;
                 case var _ when button == newGame:
-                    GameStart();
+                    TutorialStart();
                     break;
                 case var _ when button == setting:
                     break;
@@ -61,7 +62,7 @@ namespace SceneEventer
         {
             buttons = new Button[][]
             {
-                    //new Button[]{gameStart},
+                    new Button[]{gameStart},
                     new Button[]{newGame},
                     //new Button[]{setting},
                     new Button[]{QuitGame}
@@ -74,11 +75,33 @@ namespace SceneEventer
             }
         }
 
+        // タイトルSE.
+        private SEPlayer titleSEPlayer;
+
         private void Start()
         {
             // 初期状態: ビデオ未再生・UI操作有効.
             currentAnimeState = new stateAnimeloopStop();
             currentAnimeState.OnEnter(this);
+
+            // SE初期化（SEファイルが存在しなくてもエラーにならない）.
+            InitializeTitleSE().Forget();
+        }
+
+        private async UniTaskVoid InitializeTitleSE()
+        {
+            titleSEPlayer = SEPlayer.Create("TitleSE");
+            await titleSEPlayer.LoadClipsAsync("SE_Title_Select", "SE_Title_Submit");
+        }
+
+        protected override void OnButtonSelected(UnityEngine.UI.Button button)
+        {
+            titleSEPlayer?.Play("SE_Title_Select");
+        }
+
+        protected override void OnButtonSubmitted(UnityEngine.UI.Button button)
+        {
+            titleSEPlayer?.Play("SE_Title_Submit");
         }
 
         private void LateUpdate()
@@ -219,6 +242,9 @@ namespace SceneEventer
 
         public void GameStart()
         {
+            // チュートリアルモード解除（残留防止）.
+            PlayerPrefs.SetInt("TutorialMode", 0);
+
             // Enemy名 → EnemyName enumへの変換.
             EnemyName enemy = MissionTagToEnemyName(enemyName);
             PlayerPrefs.SetInt("EnemyName", (int)enemy);
@@ -231,6 +257,15 @@ namespace SceneEventer
 
             // MainSceneInfo で敵生成を含むシーンをロード.
             SceneManager.Instance().LoadMainScene(new MainSceneInfo()).Forget();
+        }
+
+        public void TutorialStart()
+        {
+            // チュートリアルモード PlayerPrefs 設定.
+            PlayerPrefs.SetInt("TutorialMode", 1);
+            PlayerPrefs.Save();
+
+            SceneManager.Instance().LoadMainScene(new TutorialInfo()).Forget();
         }
 
         public void NewGame()
@@ -285,7 +320,6 @@ namespace SceneEventer
             // ビデオ再生開始.
             eventer.PlayVideo();
 
-            // (既)修: 停止条件の監視をここで呼び出し.
             eventer.StartInputMonitoring();
         }
 

@@ -217,6 +217,15 @@ namespace InGame.Player
         }
 
         /// <summary>
+        /// プレイヤーアクション（移動・攻撃等）の有効/無効を切り替え.
+        /// ポーズボタン(ESC)は無効化されない.
+        /// </summary>
+        public void SetPlayerActionEnable(bool enable)
+        {
+            playerPresenter?.SetPlayerActionEnable(enable);
+        }
+
+        /// <summary>
         /// 外部からダメージを受ける（Enemy等から呼び出し用）.
         /// </summary>
         /// <param name="damageData">ダメージデータ.</param>

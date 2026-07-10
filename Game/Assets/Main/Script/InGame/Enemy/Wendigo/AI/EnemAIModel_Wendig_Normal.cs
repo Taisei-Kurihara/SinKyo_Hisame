@@ -244,6 +244,18 @@ public class EnemAIModel_Wendig_Normal : EnemAIModel_abstract
             shouldActivate = true
         });
 
+        // 大技MeteorDrop設定（第二形態の通常抽選用、移動なし）.
+        AddActionSetting(new EnemAIActionSetting
+        {
+            actionState = meteorDropState,
+            repeatableCount = -1,
+            activationDistance = 20f,
+            moveStartDistance = 20f,
+            activationWeight = 0.8f,
+            moveState = null,
+            shouldActivate = false // 初期状態は無効（第二形態で有効化）.
+        });
+
         isInitialized = true;
     }
 }

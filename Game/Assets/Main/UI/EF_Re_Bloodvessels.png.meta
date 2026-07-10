@@ -1,0 +1,871 @@
+fileFormatVersion: 2
+guid: bc5924ffd10f9d444be1418a950259a0
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 1776552645621185183
+    second: EF_Re_Bloodvessels_0
+  - first:
+      213: 2006325676334596753
+    second: EF_Re_Bloodvessels_1
+  - first:
+      213: -1203035119282074613
+    second: EF_Re_Bloodvessels_2
+  - first:
+      213: -4736649404897790089
+    second: EF_Re_Bloodvessels_3
+  - first:
+      213: 6277685499866364585
+    second: EF_Re_Bloodvessels_4
+  - first:
+      213: -8781870158823332881
+    second: EF_Re_Bloodvessels_5
+  - first:
+      213: -1413384255271366156
+    second: EF_Re_Bloodvessels_6
+  - first:
+      213: 3232956924086819072
+    second: EF_Re_Bloodvessels_7
+  - first:
+      213: -642639686411229563
+    second: EF_Re_Bloodvessels_8
+  - first:
+      213: -1713220720795219240
+    second: EF_Re_Bloodvessels_9
+  - first:
+      213: -6555913538659783347
+    second: EF_Re_Bloodvessels_10
+  - first:
+      213: 2318091328017572820
+    second: EF_Re_Bloodvessels_11
+  - first:
+      213: -2191768753254825672
+    second: EF_Re_Bloodvessels_12
+  - first:
+      213: -6012715131481784833
+    second: EF_Re_Bloodvessels_13
+  - first:
+      213: -7310011125456467228
+    second: EF_Re_Bloodvessels_14
+  - first:
+      213: 370661651952509810
+    second: EF_Re_Bloodvessels_15
+  - first:
+      213: -2890321137216341886
+    second: EF_Re_Bloodvessels_16
+  - first:
+      213: 5345720160172683923
+    second: EF_Re_Bloodvessels_17
+  - first:
+      213: -8544289195938205397
+    second: EF_Re_Bloodvessels_18
+  - first:
+      213: -2122811396454334038
+    second: EF_Re_Bloodvessels_19
+  - first:
+      213: -6061783115178016824
+    second: EF_Re_Bloodvessels_20
+  - first:
+      213: -3043816388697270395
+    second: EF_Re_Bloodvessels_21
+  - first:
+      213: -5085392270599123608
+    second: EF_Re_Bloodvessels_22
+  - first:
+      213: 2821261468524575062
+    second: EF_Re_Bloodvessels_23
+  - first:
+      213: -677789804868523254
+    second: EF_Re_Bloodvessels_24
+  - first:
+      213: 5744140055010612213
+    second: EF_Re_Bloodvessels_25
+  - first:
+      213: -1314036754548371866
+    second: EF_Re_Bloodvessels_26
+  - first:
+      213: -8636308454504225195
+    second: EF_Re_Bloodvessels_27
+  - first:
+      213: 6874381091795258061
+    second: EF_Re_Bloodvessels_28
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 1
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 724
+        width: 224
+        height: 319
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f9af707f73597a810800000000000000
+      internalID: 1776552645621185183
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_1
+      rect:
+        serializedVersion: 2
+        x: 37
+        y: 790
+        width: 439
+        height: 290
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 1924ba99296e7db10800000000000000
+      internalID: 2006325676334596753
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_2
+      rect:
+        serializedVersion: 2
+        x: 448
+        y: 804
+        width: 412
+        height: 276
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b0c4fd6dee5fd4fe0800000000000000
+      internalID: -1203035119282074613
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_3
+      rect:
+        serializedVersion: 2
+        x: 904
+        y: 991
+        width: 25
+        height: 89
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 777708b467a044eb0800000000000000
+      internalID: -4736649404897790089
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_4
+      rect:
+        serializedVersion: 2
+        x: 965
+        y: 875
+        width: 76
+        height: 205
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9aab72793b1de1750800000000000000
+      internalID: 6277685499866364585
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_5
+      rect:
+        serializedVersion: 2
+        x: 1055
+        y: 933
+        width: 203
+        height: 147
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: fe36bbf6e97802680800000000000000
+      internalID: -8781870158823332881
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_6
+      rect:
+        serializedVersion: 2
+        x: 1269
+        y: 848
+        width: 125
+        height: 232
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4f19b6d1286a26ce0800000000000000
+      internalID: -1413384255271366156
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_7
+      rect:
+        serializedVersion: 2
+        x: 1405
+        y: 839
+        width: 114
+        height: 241
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 009955a8135cddc20800000000000000
+      internalID: 3232956924086819072
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_8
+      rect:
+        serializedVersion: 2
+        x: 1512
+        y: 945
+        width: 106
+        height: 135
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 586e3ec2c92e417f0800000000000000
+      internalID: -642639686411229563
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_9
+      rect:
+        serializedVersion: 2
+        x: 1558
+        y: 606
+        width: 350
+        height: 474
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8da892bd4da6938e0800000000000000
+      internalID: -1713220720795219240
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_10
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 651
+        width: 304
+        height: 132
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d4d620e0f57b405a0800000000000000
+      internalID: -6555913538659783347
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_11
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 230
+        width: 316
+        height: 432
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4d3a663f7c38b2020800000000000000
+      internalID: 2318091328017572820
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_12
+      rect:
+        serializedVersion: 2
+        x: 1729
+        y: 612
+        width: 191
+        height: 210
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 83102707ee54591e0800000000000000
+      internalID: -2191768753254825672
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_13
+      rect:
+        serializedVersion: 2
+        x: 1578
+        y: 0
+        width: 209
+        height: 425
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ffd7964d17b8e8ca0800000000000000
+      internalID: -6012715131481784833
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_14
+      rect:
+        serializedVersion: 2
+        x: 1680
+        y: 28
+        width: 240
+        height: 350
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4ea830b8c9f9d8a90800000000000000
+      internalID: -7310011125456467228
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_15
+      rect:
+        serializedVersion: 2
+        x: 1736
+        y: 335
+        width: 184
+        height: 311
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2732d700fcad42500800000000000000
+      internalID: 370661651952509810
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_16
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 105
+        width: 303
+        height: 174
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 288ba614d3483e7d0800000000000000
+      internalID: -2890321137216341886
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_17
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 10
+        width: 272
+        height: 199
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 392bcbfa920df2a40800000000000000
+      internalID: 5345720160172683923
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_18
+      rect:
+        serializedVersion: 2
+        x: 108
+        y: 0
+        width: 325
+        height: 271
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: b2135e1fe369c6980800000000000000
+      internalID: -8544289195938205397
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_19
+      rect:
+        serializedVersion: 2
+        x: 211
+        y: 0
+        width: 250
+        height: 136
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: aa1403538424a82e0800000000000000
+      internalID: -2122811396454334038
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_20
+      rect:
+        serializedVersion: 2
+        x: 427
+        y: 0
+        width: 203
+        height: 272
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 8cf7a5a9f5830eba0800000000000000
+      internalID: -6061783115178016824
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_21
+      rect:
+        serializedVersion: 2
+        x: 582
+        y: 0
+        width: 217
+        height: 221
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 587df2e0f1132c5d0800000000000000
+      internalID: -3043816388697270395
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_22
+      rect:
+        serializedVersion: 2
+        x: 784
+        y: 0
+        width: 123
+        height: 207
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 86d0c676cae0d69b0800000000000000
+      internalID: -5085392270599123608
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_23
+      rect:
+        serializedVersion: 2
+        x: 895
+        y: 0
+        width: 172
+        height: 296
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 65977e1ab52272720800000000000000
+      internalID: 2821261468524575062
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_24
+      rect:
+        serializedVersion: 2
+        x: 1085
+        y: 0
+        width: 285
+        height: 231
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a0b2e6873c10896f0800000000000000
+      internalID: -677789804868523254
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_25
+      rect:
+        serializedVersion: 2
+        x: 1333
+        y: 0
+        width: 323
+        height: 242
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5f3100f32f847bf40800000000000000
+      internalID: 5744140055010612213
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_26
+      rect:
+        serializedVersion: 2
+        x: 1760
+        y: 0
+        width: 129
+        height: 151
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 66e4657a88a93cde0800000000000000
+      internalID: -1314036754548371866
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_27
+      rect:
+        serializedVersion: 2
+        x: 1005
+        y: 0
+        width: 166
+        height: 83
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 556a29eb73ba52880800000000000000
+      internalID: -8636308454504225195
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: EF_Re_Bloodvessels_28
+      rect:
+        serializedVersion: 2
+        x: 1915
+        y: 0
+        width: 5
+        height: 28
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: dca4e135e25b66f50800000000000000
+      internalID: 6874381091795258061
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: 5e97eb03825dee720800000000000000
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      EF_Re_Bloodvessels_0: 1776552645621185183
+      EF_Re_Bloodvessels_1: 2006325676334596753
+      EF_Re_Bloodvessels_10: -6555913538659783347
+      EF_Re_Bloodvessels_11: 2318091328017572820
+      EF_Re_Bloodvessels_12: -2191768753254825672
+      EF_Re_Bloodvessels_13: -6012715131481784833
+      EF_Re_Bloodvessels_14: -7310011125456467228
+      EF_Re_Bloodvessels_15: 370661651952509810
+      EF_Re_Bloodvessels_16: -2890321137216341886
+      EF_Re_Bloodvessels_17: 5345720160172683923
+      EF_Re_Bloodvessels_18: -8544289195938205397
+      EF_Re_Bloodvessels_19: -2122811396454334038
+      EF_Re_Bloodvessels_2: -1203035119282074613
+      EF_Re_Bloodvessels_20: -6061783115178016824
+      EF_Re_Bloodvessels_21: -3043816388697270395
+      EF_Re_Bloodvessels_22: -5085392270599123608
+      EF_Re_Bloodvessels_23: 2821261468524575062
+      EF_Re_Bloodvessels_24: -677789804868523254
+      EF_Re_Bloodvessels_25: 5744140055010612213
+      EF_Re_Bloodvessels_26: -1314036754548371866
+      EF_Re_Bloodvessels_27: -8636308454504225195
+      EF_Re_Bloodvessels_28: 6874381091795258061
+      EF_Re_Bloodvessels_3: -4736649404897790089
+      EF_Re_Bloodvessels_4: 6277685499866364585
+      EF_Re_Bloodvessels_5: -8781870158823332881
+      EF_Re_Bloodvessels_6: -1413384255271366156
+      EF_Re_Bloodvessels_7: 3232956924086819072
+      EF_Re_Bloodvessels_8: -642639686411229563
+      EF_Re_Bloodvessels_9: -1713220720795219240
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

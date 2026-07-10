@@ -24,6 +24,11 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
     private float retreatDistance = 3f;          // 後退距離.
     private float retreatDuration = 0.4f;       // 後退にかける時間（秒）.
 
+    // 無敵解除設定.
+    private float invincibleHeightThreshold = 1.5f; // 開始位置からこの高さ以下で無敵解除.
+    private float startY;                            // ジャンプ開始時のY座標.
+    private bool invincibilityCleared = false;       // 無敵が解除済みか.
+
     // ライフサイクル間共有データ.
     private Rigidbody2D rb;
     private Transform ownerTransform;
@@ -46,6 +51,9 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         postActionWaitFrames = 90; // 1.5秒クールダウン.
     }
 
+    /// <summary>外部からとびかかり切りを中断する（死亡時等）.</summary>
+    public void RequestAbort() { isAborted = true; }
+
     // ターゲット位置を設定（AI側から呼び出し）.
     public void SetTargetPosition(Vector3 pos)
     {
@@ -55,6 +63,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
     protected override async UniTask OnPreAction(EnemyModel_abstract enemyModel)
     {
         stateModified = false;
+        invincibilityCleared = false;
 
         if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) { isAborted = true; return; }
 
@@ -129,11 +138,9 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
 
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
-        // ジャンプ中はコライダーをトリガーに設定（Platformをすり抜けるため）.
-        if (mainColl != null)
-        {
-            mainColl.isTrigger = true;
-        }
+        // ジャンプ開始位置を記録（無敵解除の高さ判定用）.
+        startY = ownerTransform.position.y;
+
         stateModified = true;
 
         // ジャンプ速度を計算.
@@ -243,8 +250,17 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
                         // 攻撃アニメーション終了.
                         animator.ResetTrigger("Attack");
                         animator.SetTrigger("Attack_End");
+
+                        // 空中攻撃完了後: 無敵解除（コライダーをトリガーから戻す）.
+                        ClearInvincibility();
                     }
                 }
+            }
+
+            // 高さによる無敵解除: 開始位置 + 閾値 以下になったら解除.
+            if (!invincibilityCleared && ownerTransform.position.y <= startY + invincibleHeightThreshold)
+            {
+                ClearInvincibility();
             }
 
             // 着地判定.
@@ -281,13 +297,10 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         // ジャンプ終了: FixedUpdateのPlatform制御を復帰.
         enemyModel.IsJumping = false;
 
-        // コライダーのトリガーを解除（着地したので）.
-        if (mainColl != null)
-        {
-            mainColl.isTrigger = originalIsTrigger;
-        }
+        // コライダーのトリガーを解除（着地したので、未解除なら解除）.
+        ClearInvincibility();
 
-        // 着地攻撃: コライダー発動（レイヤー変更はExecuteColliderPhaseUntil内部で行う）.
+        // 着地攻撃: 前方Box判定（Circle全方向→Boxで前方のみに修正）.
         colliderState.ClearHitTargets();
         colliderState.SetDamage(jumpSlashDamage);
 
@@ -296,9 +309,9 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             enemyModel,
             new EnemColliderHelper.ColliderPhaseConfig
             {
-                colliderType = EnemColliderType.Circle,
-                offset = Vector2.zero,
-                radius = 1.5f,
+                colliderType = EnemColliderType.Box,
+                offset = new Vector2(-0.5f, 0f),
+                size = new Vector2(1.5f, 2f),
                 damage = jumpSlashDamage,
                 duration = 0.5f,
                 colliderState = colliderState
@@ -330,15 +343,23 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         await UniTask.CompletedTask;
     }
 
-    // 着地判定: Collider下端から短距離レイキャストで地面を検出.
+    // 着地判定: Collider下端より少し上からレイキャストで地面を検出.
     private bool CheckGrounded(EnemyModel_abstract enemyModel)
     {
         if (rb == null || ownerTransform == null) return false;
 
         Vector2 feetPos = GetFeetPosition(enemyModel);
 
+        // 足元が地面と重なっている場合に検出できるよう、上方向にオフセット.
+        float upOffset = 0.3f;
+        Vector2 rayOrigin = feetPos + Vector2.up * upOffset;
+
+        // 落下速度に応じてレイキャスト距離を拡大（高速落下時の検出漏れ防止）.
+        float fallSpeed = Mathf.Abs(rb.linearVelocity.y);
+        float dynamicDist = Mathf.Max(groundCheckDistance + upOffset, fallSpeed * Time.deltaTime * 2f + upOffset);
+
         // Platform/Defaultレイヤーに対して下方向レイキャスト.
-        RaycastHit2D hit = Physics2D.Raycast(feetPos, Vector2.down, groundCheckDistance, groundLayerMask);
+        RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.down, dynamicDist, groundLayerMask);
         return hit.collider != null;
     }
 
@@ -385,11 +406,15 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             rb.constraints = originalConstraints;
             rb.linearVelocity = Vector2.zero;
         }
-        if (mainColl != null)
-        {
-            mainColl.isTrigger = originalIsTrigger;
-        }
         stateModified = false;
+    }
+
+    // ジャンプ中の無敵解除ヘルパー.
+    private void ClearInvincibility()
+    {
+        if (invincibilityCleared) return;
+        invincibilityCleared = true;
+        Debug.Log($"[JumpSlash] 無敵解除 - pos: {ownerTransform.position}");
     }
 
     // EnemyModelのIsJumpingフラグを確実にクリアするヘルパー.

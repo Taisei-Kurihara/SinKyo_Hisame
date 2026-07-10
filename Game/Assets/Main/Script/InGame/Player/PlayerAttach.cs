@@ -65,21 +65,30 @@ namespace InGame.Player
         private GameObject SensorPoint;
         private CompositeDisposable disposables = new CompositeDisposable();
 
+        // Enemyレイヤーを無視するためのマスク.
+        private int ignoredLayerMask = 0;
+
         public bool Sensor => SensorNum > 0;
         /// <summary>
         /// センサーが反応している時1以上になっている。
         /// </summary>
         public int SensorNum { get; private set; } = 0;
-        public void OnSensor() 
+        public void OnSensor()
         {
+            // Enemyレイヤーを除外.
+            int enemyLayer = LayerMask.NameToLayer("Enemy");
+            if (enemyLayer >= 0) ignoredLayerMask = 1 << enemyLayer;
+
             disposables.Clear();
             disposables.Add(SensorPoint.OnTriggerEnter2DAsObservable()
+                .Where(col => col != null && (ignoredLayerMask & (1 << col.gameObject.layer)) == 0)
                 .Subscribe(_ =>
                 {
                     SensorNum += 1;
                 }).AddTo(SensorPoint));
             disposables.Add(SensorPoint.OnTriggerExit2DAsObservable()
-            .Where(_ => SensorNum > 0)//0以上の時しかできないようにフィルタ
+                .Where(col => col != null && (ignoredLayerMask & (1 << col.gameObject.layer)) == 0)
+                .Where(_ => SensorNum > 0)//0以上の時しかできないようにフィルタ
                 .Subscribe(_ =>
             {
                 SensorNum--;

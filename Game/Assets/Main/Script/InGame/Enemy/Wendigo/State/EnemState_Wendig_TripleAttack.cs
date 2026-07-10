@@ -6,8 +6,8 @@ public class EnemState_Wendig_TripleAttack : EnemState_abstract
 {
     // 三連撃: 0.75/1.1/1.35倍.
     private float[] attackMultipliers = { 0.75f, 1.1f, 1.35f };
-    private Vector2 attackOffset = new Vector2(0.1f, 0f);
-    private Vector2 attackSize = new Vector2(0.35f, 2f);
+    private Vector2 attackOffset = new Vector2(0.5f, 0f);
+    private Vector2 attackSize = new Vector2(1.5f, 2f);
 
     // 三連撃のトリガー名.
     private string[] attackTriggers = { "TripleAttack_0", "TripleAttack_1", "TripleAttack_2" };

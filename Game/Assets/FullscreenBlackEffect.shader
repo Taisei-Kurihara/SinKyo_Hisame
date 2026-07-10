@@ -4,6 +4,9 @@ Shader "Custom/FullscreenBlackEffect"
     {
         _MainTex ("Texture", 2D) = "white" {}
         _Blend ("Blend", Range(0, 1)) = 1
+        _GrayscaleRatio ("GrayscaleRatio", Range(0, 1)) = 0
+        _FillEnabled ("FillEnabled", Float) = 1
+        _FillThreshold ("FillThreshold", Range(0, 1)) = 0.01
     }
 
     SubShader
@@ -43,6 +46,9 @@ Shader "Custom/FullscreenBlackEffect"
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
             float _Blend;
+            float _GrayscaleRatio;
+            float _FillEnabled;
+            float _FillThreshold;
 
             Varyings Vert(Attributes input)
             {
@@ -56,7 +62,7 @@ Shader "Custom/FullscreenBlackEffect"
                 output.positionHCS = float4(pos * 2.0 - 1.0, 0.0, 1.0);
                 output.uv = pos;
 
-                // Direct3Dのレンダーテクスチャ描画時UV反転補正.
+                // Direct3D UV Y-flip.
                 #if UNITY_UV_STARTS_AT_TOP
                 output.uv.y = 1.0 - output.uv.y;
                 #endif
@@ -72,12 +78,28 @@ Shader "Custom/FullscreenBlackEffect"
                     input.uv
                 );
 
-                // 背景判定: alpha≈0 は背景 → 白塗り.
-                if (color.a <= 0.01)
-                    return half4(1, 1, 1, _Blend);
+                // Mode 1: Fill mode (alpha threshold).
+                // alpha > threshold -> black, alpha <= threshold -> white.
+                if (_FillEnabled > 0.5)
+                {
+                    if (color.a <= _FillThreshold)
+                        return half4(1, 1, 1, _Blend);
 
-                // オブジェクト部分を黒塗り（_Blendで強度制御）.
-                return half4(0, 0, 0, color.a * _Blend);
+                    return half4(0, 0, 0, color.a * _Blend);
+                }
+
+                // Mode 2: Grayscale desaturation.
+                // _GrayscaleRatio: 0=normal, 0.5=halfway, 1=fully B&W (二値化: 000 or 111).
+                // シェーダー内でlerp合成（アルファブレンド依存を排除）.
+                float lum = dot(color.rgb, float3(0.299, 0.587, 0.114));
+                half3 gray = half3(lum, lum, lum);
+                // max時は二値化（完全白黒: rgb 000 or 111）.
+                half bwVal = step(0.5, lum);
+                half3 bw = half3(bwVal, bwVal, bwVal);
+                // ratio < 1: 元色→グレースケール. ratio ≈ 1: グレースケール→二値化.
+                half3 desaturated = lerp(gray, bw, saturate((_GrayscaleRatio - 0.8) * 5.0));
+                half3 result = lerp(color.rgb, desaturated, _GrayscaleRatio);
+                return half4(result, _GrayscaleRatio > 0.001 ? 1.0 : 0.0);
             }
 
             ENDHLSL

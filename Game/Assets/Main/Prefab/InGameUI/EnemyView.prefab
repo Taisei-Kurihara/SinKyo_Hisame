@@ -372,8 +372,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: EnemyName
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 20a0ccf224e8c40438aacc99cd2ec0e5, type: 2}
-  m_sharedMaterial: {fileID: -6087535585406322814, guid: 20a0ccf224e8c40438aacc99cd2ec0e5, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 2e498d1c8094910479dc3e1b768306a4, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 2e498d1c8094910479dc3e1b768306a4, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []

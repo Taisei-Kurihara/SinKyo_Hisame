@@ -1,6 +1,7 @@
 using UnityEngine;
 using Common;
 using Cysharp.Threading.Tasks;
+using Tutorial;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 
@@ -82,6 +83,11 @@ namespace InGame.Player
             characterInstance = Object.Instantiate(prefab, spawnPos.Value, Quaternion.identity);
             // カメラを追従させる(シーン跨ぎではない）.
             CameraManager.Instance(false).SetFollowTarget(characterInstance.transform);
+
+            // TutorialCanvas 生成（Player生成に紐づけ）.
+            TutorialManager.Instance();
+            await Addressables.InstantiateAsync("TutorialCanvas");
+            await TutorialManager.Instance().WaitForView();
         }
 
         /// <summary>
@@ -99,6 +105,16 @@ namespace InGame.Player
                 Addressables.Release(characterHandle);
                 characterHandle = default;
             }
+        }
+
+        /// <summary>
+        /// プレイヤーアクション（移動・攻撃等）の有効/無効を切り替え.
+        /// TutorialManager等の外部システムから呼ばれる.
+        /// </summary>
+        public void SetPlayerActionEnable(bool enable)
+        {
+            var playerScope = Object.FindFirstObjectByType<PlayerScope>();
+            playerScope?.SetPlayerActionEnable(enable);
         }
 
         private void OnDestroy()

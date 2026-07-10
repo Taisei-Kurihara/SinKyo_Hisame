@@ -56,6 +56,13 @@ public static class EnemAttackPhaseHelper
         float animSpeed = 1f)
     {
         int effectiveFrames = (int)(waitFrames / animSpeed);
+
+        // プレイヤーがスタン中ならクールタイム半減.
+        if (InGame.Player.PlayerPresenter.IsPlayerStunning)
+        {
+            effectiveFrames /= 2;
+        }
+
         for (int i = 0; i < effectiveFrames; i++)
         {
             if (!EnemNullSafetyHelper.IsValid(enemyModel)) return false;

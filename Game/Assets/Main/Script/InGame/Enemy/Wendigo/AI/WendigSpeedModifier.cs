@@ -60,27 +60,27 @@ public static class WendigSpeedModifierTable
         postActionMultiplier = 0.7f
     };
 
-    // Berserk phase + 通常状態.
+    // Berserk phase + 通常状態 (×1.1倍速).
     public static readonly WendigSpeedModifier BerserkDefault = new WendigSpeedModifier
     {
-        waitMultiplier = 0.7f,
-        speedMultiplier = 1.2f,
-        postActionMultiplier = 0.7f
+        waitMultiplier = 0.64f,
+        speedMultiplier = 1.32f,
+        postActionMultiplier = 0.64f
     };
 
-    // Berserk phase + 怒り中.
+    // Berserk phase + 怒り中 (×1.1倍速).
     public static readonly WendigSpeedModifier BerserkAngry = new WendigSpeedModifier
     {
-        waitMultiplier = 0.6f,
-        speedMultiplier = 1.3f,
-        postActionMultiplier = 0.6f
+        waitMultiplier = 0.55f,
+        speedMultiplier = 1.43f,
+        postActionMultiplier = 0.55f
     };
 
-    // Berserk phase + 疲労中.
+    // Berserk phase + 疲労中 (×1.1倍速).
     public static readonly WendigSpeedModifier BerserkFatigue = new WendigSpeedModifier
     {
-        waitMultiplier = 1.2f,
-        speedMultiplier = 0.8f,
-        postActionMultiplier = 1.2f
+        waitMultiplier = 1.09f,
+        speedMultiplier = 0.88f,
+        postActionMultiplier = 1.09f
     };
 }

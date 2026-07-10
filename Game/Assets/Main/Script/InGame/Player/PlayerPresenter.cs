@@ -9,6 +9,7 @@ using InGame;
 using InGame.Player;
 using InGame.Player.Animation;
 using InGame.Common;
+using Tutorial;
 
 namespace InGame.Player
 {
@@ -54,13 +55,32 @@ namespace InGame.Player
         private IGuard guard = new Guard_Player_Default();
 
         private bool playerControllerEnable = true;
+        private bool playerActionEnable = true;
 
         // HeartResist状態.
         private bool isHeartResisting = false;
         private bool isStrongHeartResist = false;
+        private bool wasMovingDuringHeartResist = false;
         private float heartResistCooldownEnd = 0f;
         private const float heartResistCooldown = 0.825f;
         private float heartResistStartTime = 0f;
+
+        // 居合発動条件用.
+        private float iaiReadyRatio = 0f;
+        private bool iaiReadyNotified = false; // 居合発動可能通知済みフラグ.
+        private const float iaiWeakRequiredSeconds = 5f;
+        private const float iaiStrongRequiredSeconds = 2f;
+        private const float iaiGaugeDecayDuration = 5f; // HeartResist解除後のゲージ減衰時間（秒）.
+
+        // ポーズボタン長押し判定用.
+        private bool isPoseHolding = false;
+        private float poseHoldTime = 0f;
+        private const float titleReturnHoldDuration = 1.5f;
+        private const float shortPressThreshold = 0.3f;
+        private bool isTutorialVisible = false;
+
+        // チュートリアル出現時の移動入力無視用.
+        private bool ignoreMoveUntilRelease = false;
 
         // 鼓動0デバフ用変数.
         private bool isPulseZero = false;
@@ -68,6 +88,10 @@ namespace InGame.Player
         private const float pulseZeroDebuffDelay = 2f;
 
         // 鼓動200スタン用変数.
+        public static bool IsPlayerStunning { get; private set; } = false;
+
+        /// <summary>居合発動検知フラグ（チュートリアル監視用）.</summary>
+        public static bool IsIaiPerformed { get; set; } = false;
         private bool isPulseMaxStunning = false;
         private bool stunInterruptedByDamage = false;
 
@@ -226,8 +250,8 @@ namespace InGame.Player
                             return;
                         }
 
-                        // false → true 遷移 = 着地.
-                        if (!prevGround && current)
+                        // false → true 遷移 = 着地（死亡後は無視）.
+                        if (!prevGround && current && playerControllerEnable)
                         {
                             Debug.Log("[PlayerPresenter] 着地検出 - JumpOnGround / Idol トリガー発火");
                             playerAnimation?.PlayJumpOnGround();
@@ -250,6 +274,9 @@ namespace InGame.Player
                     playerControllerEnable = false;
                     inputActions?.CharacterController.Disable();
                     inputActions?.Player.Disable();
+
+                    // 歩き/着地アニメーション遷移を停止し着地判定を即座に解除.
+                    playerAnimation?.NotifyDead();
 
                     // 死亡アニメーション再生.
                     playerAnimation?.PlayTrigger("Dead");
@@ -277,6 +304,15 @@ namespace InGame.Player
             InitalizePlayerEvents();
         }
 
+        /// <summary>
+        /// プレイヤーのアクション（移動・攻撃等）の有効/無効を切り替え.
+        /// ポーズボタン(ESC)は無効化されない.
+        /// </summary>
+        public void SetPlayerActionEnable(bool enable)
+        {
+            playerActionEnable = enable;
+        }
+
         
         /// <summary>
         ///　キー操作関係の関数
@@ -285,11 +321,11 @@ namespace InGame.Player
         {
             playerStatusModel.Update();
 
-            // ポーズボタン: タイトルに戻る.
-            if (inputActions.Player.Pose.WasPressedThisFrame())
-            {
-                SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
-            }
+            // ポーズボタン: 短押し=tutorial表示 / 長押し=タイトルに戻る.
+            UpdatePoseButton();
+
+            // チュートリアル等でアクション無効化中は移動・攻撃等をスキップ.
+            if (!playerActionEnable) return;
 
             // プレイヤーのアクション中・スタン中は行動入力を受け付けない.
             if (playerModel.enableAction == false && !isPulseMaxStunning)
@@ -297,6 +333,16 @@ namespace InGame.Player
 
                 // 移動 - 居合中は全操作無視、HeartResist中は弱:0.2→0.5 ramp / 強:×0.01.
                 Vector2 moveInput = isIaiActive ? Vector2.zero : inputActions.CharacterController.Move.ReadValue<Vector2>();
+
+                // チュートリアル出現後、移動入力が一度0に戻るまで無視.
+                if (ignoreMoveUntilRelease)
+                {
+                    if (Mathf.Approximately(moveInput.x, 0f))
+                        ignoreMoveUntilRelease = false;
+                    else
+                        moveInput = Vector2.zero;
+                }
+
                 if (isHeartResisting)
                 {
                     if (isStrongHeartResist)
@@ -315,22 +361,46 @@ namespace InGame.Player
                 // 入力方向をアニメーションコントローラーに通知（攻撃中は呼ばれないため反動反転を防止）.
                 playerAnimation?.SetInputDirection(moveInput.x);
 
+                // HeartResist弱中: 移動→停止時にsheathing_of_swordトリガーを再発火してアニメーション復帰.
+                if (isHeartResisting && !isStrongHeartResist)
+                {
+                    bool isMovingNow = Mathf.Abs(moveInput.x) > 0.01f;
+                    if (wasMovingDuringHeartResist && !isMovingNow)
+                    {
+                        // 居合発動可能状態なら sheathing_of_sword_2、そうでなければ sheathing_of_sword.
+                        string trigger = iaiReadyNotified ? "sheathing_of_sword_2" : "sheathing_of_sword";
+                        playerAnimation?.PlayTrigger(trigger);
+                    }
+                    wasMovingDuringHeartResist = isMovingNow;
+                }
+
                 // 居合中は移動以外の操作も全て無視.
                 if (!isIaiActive)
                 {
-                // 攻撃入力.
+                // 居合発動条件チェック: 達成中は通常攻撃を無効化し、居合に専念させる.
+                bool iaiConditionsMet = false;
+                if (isHeartResisting)
+                {
+                    iaiConditionsMet = iaiReadyRatio >= 1f;
+                }
+
+                // 攻撃入力（居合条件未達成時のみ）.
+                if (!iaiConditionsMet)
+                {
                 if (inputActions.CharacterController.FirstAttack.WasPressedThisFrame())
                 { ExecuteJakComboAttackAsync().Forget(); }
                 else if (inputActions.CharacterController.SecondAttack.WasPressedThisFrame())
                 { EndJakComboIfActive(); ExecuteMeleeAttackAsync("FirstAttack").Forget(); }
                 else if (inputActions.CharacterController.SpecialAttack.WasPressedThisFrame())
                 { EndJakComboIfActive(); ExecuteMeleeAttackAsync("RestrainAttack").Forget(); }
+                }
 
                 // 操作が統一されているものの為、判定を書いていく.
                 // 回避（回避居合い判定付き）.
                 if (inputActions.CharacterController.Dodge.WasPressedThisFrame())
                 {
                     EndJakComboIfActive();
+                    attackCommander.ForceHideZanEffect();
                     Vector2 dodgeDir = inputActions.CharacterController.Move.ReadValue<Vector2>();
                     var dodgeIaiResult = CheckDodgeIaiCondition(dodgeDir);
                     if (dodgeIaiResult.shouldTriggerIai)
@@ -340,12 +410,27 @@ namespace InGame.Player
                     else
                     {
                         playerModel.OnDodge(dodgeDir);
+
+                        // パリィ不可攻撃（怒り行動）中の回避: 専用SE再生のみ（ダメージ/スタンなし）.
+                        var parryEnemy = UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>();
+                        if (parryEnemy != null && parryEnemy.IsAngerAction)
+                        {
+                            Vector2 pPos = playerModel.GetAvator() != null
+                                ? (Vector2)playerModel.GetAvator().transform.position
+                                : Vector2.zero;
+                            float pDist = Vector2.Distance(pPos, (Vector2)parryEnemy.transform.position);
+                            if (pDist <= iaiDodgeDistance)
+                            {
+                                Debug.Log("[PlayerPresenter] 通常回避 → パリィ不可攻撃: ダメージ/スタンなし");
+                            }
+                        }
                     }
                 }
                 // 回復.
                 if (inputActions.CharacterController.Heal.WasPressedThisFrame())
                 {
                     EndJakComboIfActive();
+                    attackCommander.ForceHideZanEffect();
                     int healPointBefore = playerStatusModel.healPoint.Value;
                     int gageBefore = drainModel.num.Value;
                     playerStatusModel.Heal();
@@ -369,6 +454,7 @@ namespace InGame.Player
                 if (inputActions.CharacterController.Jump.WasPressedThisFrame())
                 {
                     EndJakComboIfActive();
+                    attackCommander.ForceHideZanEffect();
                     playerModel.OnJumpEvent();
                     playerAnimation?.PlayJump();
                 }
@@ -392,23 +478,56 @@ namespace InGame.Player
             {
                 isHeartResisting = true;
                 heartResistStartTime = UnityEngine.Time.time;
-                playerAnimation?.PlayTrigger("Hurt");
-                Debug.Log("[PlayerPresenter] HeartResist Start - Hurt trigger");
+                wasMovingDuringHeartResist = false;
+
+                // ゲージが既に溜まっている場合は居合準備済みアニメを再生.
+                if (iaiReadyRatio >= 1f)
+                {
+                    iaiReadyNotified = true;
+                    playerAnimation?.PlayTrigger("sheathing_of_sword_2");
+                    Debug.Log("[PlayerPresenter] HeartResist Start - ゲージ残存: sheathing_of_sword_2 trigger");
+                }
+                else
+                {
+                    iaiReadyNotified = false;
+                    playerAnimation?.PlayTrigger("sheathing_of_sword");
+                    Debug.Log($"[PlayerPresenter] HeartResist Start - sheathing_of_sword trigger (ratio={iaiReadyRatio:F2})");
+                }
+            }
+
+            // HeartResist強モード判定（enableActionに関係なく毎フレーム更新）.
+            // 片方押し中にもう片方をWasPressedThisFrameで押した瞬間にも強へ移行できるよう、
+            // IsPressed()とWasPressedThisFrame()の両方で判定する.
+            if (isHeartResisting && !isPulseMaxStunning)
+            {
+                bool hrPressed = inputActions.CharacterController.HeartResist.IsPressed();
+                bool guPressed = inputActions.CharacterController.Guard.IsPressed();
+                bool hrJustPressed = inputActions.CharacterController.HeartResist.WasPressedThisFrame();
+                bool guJustPressed = inputActions.CharacterController.Guard.WasPressedThisFrame();
+
+                // どちらかが押されていてもう片方が新たに押された瞬間 → 強に即移行.
+                if ((hrPressed && guJustPressed) || (guPressed && hrJustPressed))
+                    isStrongHeartResist = true;
+                // 両方押し続けている間は強を維持.
+                else if (hrPressed && guPressed)
+                    isStrongHeartResist = true;
+                // 片方だけ押している場合は弱（既に強になっていたら維持しない）.
+                else if (hrPressed || guPressed)
+                    isStrongHeartResist = false;
+
+                // 強モード中は移動アニメーション完全抑制.
+                playerAnimation?.SetSuppressMovement(isStrongHeartResist);
             }
 
             // HeartResist実行中 - 鼓動減少 (スタン中・居合中は停止).
-            // RB+LB同時押しなら「強」、片方のみなら「弱」.
             if (!isPulseMaxStunning && !playerModel.enableAction && isHeartResisting
                 && (inputActions.CharacterController.HeartResist.IsPressed()
                     || inputActions.CharacterController.Guard.IsPressed()))
             {
-                bool isStrong = inputActions.CharacterController.HeartResist.IsPressed()
-                             && inputActions.CharacterController.Guard.IsPressed();
-
                 // 鼓動100越えの時は秒間10減少、それ以外は秒間5減少.
                 float decreaseRate = pulseModel.GetPulseGauge() > 100f ? 10f : 5f;
                 // 強は3倍.
-                if (isStrong) decreaseRate *= 3f;
+                if (isStrongHeartResist) decreaseRate *= 3f;
                 // 0.2から2秒かけて本来の減少量に到達.
                 float elapsedHR = UnityEngine.Time.time - heartResistStartTime;
                 float tHR = Mathf.Clamp01(elapsedHR / 2.0f);
@@ -419,29 +538,73 @@ namespace InGame.Player
                 // 心拍数減少時の攻撃力バフ: 減少量に応じてstrengthRateを上昇（1.75倍係数）.
                 playerStatusModel.strengthRate += decreaseAmount * 0.01f * 1.75f;
 
-                isStrongHeartResist = isStrong;
+                // 居合発動割合を蓄積（弱:5秒、強:2秒で100%）.
+                float requiredSec = isStrongHeartResist ? iaiStrongRequiredSeconds : iaiWeakRequiredSeconds;
+                iaiReadyRatio += (1f / requiredSec) * UnityEngine.Time.deltaTime;
+
+                // 居合発動可能通知（条件達成時に1回だけ sheathing_of_sword_2 トリガー）.
+                if (!iaiReadyNotified && iaiReadyRatio >= 1f)
+                {
+                    iaiReadyNotified = true;
+                    playerAnimation?.PlayTrigger("sheathing_of_sword_2");
+                    playerAnimation?.SetIaiWarning(true);
+                    guardSEPlayer?.Play("SE_IaiReady");
+                    Debug.Log("[PlayerPresenter] Iai ready - sheathing_of_sword_2 trigger + warning start");
+                }
+            }
+
+            // 居合発動判定（HeartResist中 + ゲージ100% + 攻撃キー）.
+            if (isHeartResisting && !isIaiActive
+                && inputActions.CharacterController.FirstAttack.WasPressedThisFrame()
+                && iaiReadyRatio >= 1f)
+            {
+                isHeartResisting = false;
+                isStrongHeartResist = false;
+                iaiReadyRatio = 0f;
+                iaiReadyNotified = false;
+                heartResistCooldownEnd = UnityEngine.Time.time + heartResistCooldown;
+                playerAnimation?.SetSuppressMovement(false);
+                playerAnimation?.SetIaiWarning(false);
+                ExecuteIaiAttackAsync().Forget();
+                Debug.Log($"[PlayerPresenter] Iai発動 (ratio={iaiReadyRatio:F2})");
             }
 
             // HeartResist終了（両方離されたとき）.
+            // ゲージはリセットせず、5秒かけて0に減衰する.
             if (isHeartResisting
                 && !inputActions.CharacterController.HeartResist.IsPressed()
                 && !inputActions.CharacterController.Guard.IsPressed())
             {
                 isHeartResisting = false;
                 isStrongHeartResist = false;
+                // iaiReadyRatio はリセットしない（5sec減衰）.
+                wasMovingDuringHeartResist = false;
                 heartResistCooldownEnd = UnityEngine.Time.time + heartResistCooldown;
-                if (pulseModel.GetPulseGauge() < 100f)
+                playerAnimation?.SetSuppressMovement(false);
+                playerAnimation?.SetIaiWarning(false);
+                // 居合は攻撃キーで発動するため、ここでは終了アニメのみ.
+                playerAnimation?.PlayTrigger("hearEnd");
+                Debug.Log($"[PlayerPresenter] HeartResist End - hearEnd trigger (ratio={iaiReadyRatio:F2}, 5sec減衰開始)");
+            }
+
+            // HeartResist非実行中: 居合ゲージを5秒かけて0に減衰.
+            if (!isHeartResisting && iaiReadyRatio > 0f)
+            {
+                iaiReadyRatio -= (1f / iaiGaugeDecayDuration) * UnityEngine.Time.deltaTime;
+                if (iaiReadyRatio <= 0f)
                 {
-                    // 鼓動100未満 - 居合攻撃実行.
-                    ExecuteIaiAttackAsync().Forget();
-                    Debug.Log("[PlayerPresenter] HeartResist End - Iai trigger (pulse < 100)");
+                    iaiReadyRatio = 0f;
+                    iaiReadyNotified = false;
+                    playerAnimation?.SetIaiWarning(false);
                 }
-                else
-                {
-                    // 鼓動100以上 - 終了アニメーション.
-                    playerAnimation?.PlayTrigger("hearEnd");
-                    Debug.Log("[PlayerPresenter] HeartResist End - hearEnd trigger (pulse >= 100)");
-                }
+            }
+
+            // HeartResist非実行中: strengthRateを5秒かけて1.0fに減衰.
+            if (!isHeartResisting && playerStatusModel.strengthRate > 1.0f)
+            {
+                playerStatusModel.strengthRate -= 0.5f * UnityEngine.Time.deltaTime;
+                if (playerStatusModel.strengthRate < 1.0f)
+                    playerStatusModel.strengthRate = 1.0f;
             }
         }
 
@@ -482,6 +645,14 @@ namespace InGame.Player
             {
                 stunInterruptedByDamage = true;
                 Debug.Log("[PlayerPresenter] スタン中に被弾 - スタン解除");
+            }
+
+            // 攻撃中に被弾: 攻撃クールタイムを即座にリセット.
+            if (playerModel.enableAction)
+            {
+                playerAnimation?.ClearActionAnimatorSpeed();
+                playerModel.SetEnableAction(false);
+                playerAnimation?.SetSuppressMovement(false);
             }
 
             // 吹き飛ばし処理（Powerlevelで上回った場合のみ）.
@@ -579,13 +750,105 @@ namespace InGame.Player
             gameOverView = _gameOverView;
         }
 
+        // ---- ポーズボタン: 短押し=tutorial / 長押し=タイトル戻り ----
+
+        /// <summary>
+        /// ポーズボタンの押下状態を監視し、短押し/長押しで動作を分岐.
+        /// </summary>
+        private void UpdatePoseButton()
+        {
+            var tutorialManager = TutorialManager.Instance(false);
+            TutorialView tutorialView = tutorialManager?.View;
+
+            // 押下開始.
+            if (inputActions.Player.Pose.WasPressedThisFrame())
+            {
+                isPoseHolding = true;
+                poseHoldTime = 0f;
+
+                // タイトル戻り進捗ウィンドウ表示.
+                if (tutorialView?.TitleReturnWindow != null)
+                    tutorialView.TitleReturnWindow.SetActive(true);
+                tutorialView?.SetTitleReturnProgress(0f);
+            }
+
+            // 押下中: 長押し進捗更新.
+            if (isPoseHolding && inputActions.Player.Pose.IsPressed())
+            {
+                poseHoldTime += Time.unscaledDeltaTime;
+                float progress = Mathf.Clamp01(poseHoldTime / titleReturnHoldDuration);
+
+                tutorialView?.SetTitleReturnProgress(progress);
+
+                // 長押し完了 → タイトルに戻る.
+                if (progress >= 1f)
+                {
+                    isPoseHolding = false;
+                    isTutorialVisible = false;
+                    UnityEngine.Time.timeScale = 1f;
+                    if (tutorialView?.TitleReturnWindow != null)
+                        tutorialView.TitleReturnWindow.SetActive(false);
+
+                    SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
+                    return;
+                }
+            }
+
+            // 離した: 短押し判定.
+            if (inputActions.Player.Pose.WasReleasedThisFrame() && isPoseHolding)
+            {
+                isPoseHolding = false;
+
+                // タイトル戻りウィンドウ非表示.
+                if (tutorialView?.TitleReturnWindow != null)
+                    tutorialView.TitleReturnWindow.SetActive(false);
+
+                // 短押し → tutorial表示/非表示トグル.
+                if (poseHoldTime < shortPressThreshold && tutorialManager != null)
+                {
+                    if (tutorialManager.IsTutorialScene)
+                    {
+                        // チュートリアルシーン: 入力監視中(MonitoringInput)のみポーズ可能.
+                        if (tutorialManager.CurrentPhase == Tutorial.TutorialPhase.MonitoringInput)
+                        {
+                            isTutorialVisible = true;
+                            tutorialManager.PauseTutorialScene();
+                            ignoreMoveUntilRelease = true;
+                        }
+                        else if (tutorialManager.CurrentPhase == Tutorial.TutorialPhase.ShowingExplanation)
+                        {
+                            // ポーズ中: 復帰.
+                            isTutorialVisible = false;
+                            tutorialManager.ResumeTutorialScene();
+                        }
+                    }
+                    else
+                    {
+                        // ゲームシーン: 従来通りトグル.
+                        isTutorialVisible = !isTutorialVisible;
+                        if (isTutorialVisible)
+                        {
+                            tutorialManager.StartTutorial();
+                            UnityEngine.Time.timeScale = 0f;
+                            ignoreMoveUntilRelease = true;
+                        }
+                        else
+                        {
+                            tutorialManager.HideTutorial();
+                            UnityEngine.Time.timeScale = 1f;
+                        }
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// ガード/パリィSE初期化.
         /// </summary>
         private async UniTaskVoid InitializeGuardSE()
         {
             guardSEPlayer = SEPlayer.Create("PlayerGuardSE");
-            await guardSEPlayer.LoadClipsAsync("SE_Parry", "SE_Stan", "SE_Heal", "SE_PlayerHurt");
+            await guardSEPlayer.LoadClipsAsync("SE_Parry", "SE_Stan", "SE_Heal", "SE_PlayerHurt", "SE_IaiReady");
         }
 
         /// <summary>
@@ -633,24 +896,38 @@ namespace InGame.Player
 
             playerModel.SetEnableAction(true);
             isIaiActive = true;
+            IsIaiPerformed = true;
+
+            // 居合発動: 心拍数を次の25刻み閾値へ上昇.
+            pulseModel.OnIaiActivated();
 
             // 居合中は固定x27倍速（他の影響を受けない）.
             playerAnimation?.SetAnimatorSpeed(27.0f);
 
-            playerAnimation?.PlayTrigger("Iai");
-            attackCommander.ExecuteAttack("IaiAttack");
+            try
+            {
+                // 移動アニメーション抑制 + 1f後確認.
+                playerAnimation?.SetSuppressMovement(true);
+                playerAnimation?.PlayTrigger("Iai");
+                playerAnimation?.EnsureAttackAnimation("Iai").Forget();
+                attackCommander.ExecuteAttack("IaiAttack");
 
-            // アニメーション完了を待機（27倍速のため短時間で終了）.
-            await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration / 27.0f));
+                // アニメーション完了を待機（27倍速のため短時間で終了）.
+                await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration / 27.0f));
 
-            // アニメーション速度制御を解除（移動速度による自動調整を再開）.
-            playerAnimation?.ClearActionAnimatorSpeed();
+                // アニメーション速度制御を解除（移動速度による自動調整を再開）.
+                playerAnimation?.ClearActionAnimatorSpeed();
 
-            // 居合攻撃の持続時間が終わるまで入力不可を維持.
-            await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration - iaiDuration / 27.0f));
-
-            isIaiActive = false;
-            playerModel.SetEnableAction(false);
+                // 居合攻撃の持続時間が終わるまで入力不可を維持.
+                await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration - iaiDuration / 27.0f));
+            }
+            finally
+            {
+                isIaiActive = false;
+                playerModel.SetEnableAction(false);
+                playerAnimation?.ClearActionAnimatorSpeed();
+                if (!isStrongHeartResist) playerAnimation?.SetSuppressMovement(false);
+            }
         }
 
         // ---- 回避居合い ----
@@ -716,11 +993,27 @@ namespace InGame.Player
             // 通常回避を実行（無敵+移動）.
             playerModel.OnDodge(dodgeDir);
 
-            // パリィ不可攻撃の場合: ダメージなし、居合アニメなし、パリィSEのみ再生.
+            // パリィ不可攻撃の場合: ダメージなし、居合アニメなし、スタンなし.
             if (!isParryable)
             {
+                Debug.Log("[PlayerPresenter] 回避居合い → パリィ不可攻撃: ダメージ/スタンなし");
+
+                // 吸収ゲージ上昇（パリィ不可攻撃でも回避成功時は増加）.
+                {
+                    var drainModel = PlayerManager.Instance().drainModel;
+                    int drainAmount = 5;
+                    drainModel?.Increment(drainAmount);
+                }
+
+                // パリィSE再生.
                 guardSEPlayer?.Play("SE_Parry");
-                Debug.Log("[PlayerPresenter] 回避居合い → パリィ不可攻撃: ダメージ/アニメなし");
+
+                // MeteorDrop中のパリィ: 0.5secスタン.
+                if (enemy != null && enemy.IsMeteorDropActive && enemy.Model is EnemyModel_Wendig wendigModelParry)
+                {
+                    wendigModelParry.TriggerIaiStan().Forget();
+                    Debug.Log("[PlayerPresenter] パリィ → MeteorDrop中: 0.5secスタン");
+                }
 
                 // 敵の当たり判定無効化 + 無敵延長.
                 if (enemy != null && enemy.Model != null)
@@ -729,6 +1022,7 @@ namespace InGame.Player
                     ClearSkipHitDetectionDelayed(enemy.Model).Forget();
                 }
                 ExtendDodgeInvincibility().Forget();
+
                 return;
             }
 
@@ -736,41 +1030,102 @@ namespace InGame.Player
             ForceGuardEnd();
             playerModel.OnMove(Vector2.zero);
             isIaiActive = true;
+            IsIaiPerformed = true;
 
-            playerAnimation?.SetAnimatorSpeed(27.0f);
-            playerAnimation?.PlayTrigger("Iai");
+            // 回避パリィでは心拍数25刻み変化を行わない（居合パリィのみ）.
+            // pulseModel.OnIaiActivated();
 
-            // ダメージを直接適用.
-            if (enemy != null && enemy.Status != null)
+            // 吸収ゲージ上昇.
             {
-                float iaiDamage = playerStatusModel.strength * playerStatusModel.strengthRate * 5f;
-                enemy.Status.OnDamaged(iaiDamage).Forget();
-
-                // ダメージカウンター表示（Iai型）.
-                bool facingRight = enemy.transform.position.x > playerModel.GetAvator().transform.position.x;
-                DamageCounterPool.Instance(false)?.Spawn(
-                    enemy.transform.position, iaiDamage, PlayerAttackType.Iai, facingRight);
-
-                Debug.Log($"[PlayerPresenter] 回避居合いダメージ適用: {iaiDamage:F0}");
+                var drainModel = PlayerManager.Instance().drainModel;
+                int drainAmount = 5;
+                drainModel?.Increment(drainAmount);
             }
 
-            // 敵スタン0.5sec（行動キャンセル）.
-            if (enemy != null && enemy.Model is EnemyModel_Wendig wendigModel)
+            try
             {
-                wendigModel.TriggerIaiStan().Forget();
-                Debug.Log("[PlayerPresenter] 回避居合い → 敵短スタン発動（パリィ可能攻撃）");
+                // 移動アニメーション抑制 + 1f後確認.
+                playerAnimation?.SetSuppressMovement(true);
+                playerAnimation?.SetAnimatorSpeed(27.0f);
+                playerAnimation?.PlayTrigger("Iai");
+                playerAnimation?.EnsureAttackAnimation("Iai").Forget();
+
+                // ダメージを直接適用.
+                if (enemy != null && enemy.Status != null)
+                {
+                    float iaiDamage = playerStatusModel.strength * playerStatusModel.strengthRate * 5f;
+                    enemy.Status.OnDamaged(iaiDamage).Forget();
+
+                    // ダメージカウンター表示（Iai型）.
+                    bool facingRight = enemy.transform.position.x > playerModel.GetAvator().transform.position.x;
+                    DamageCounterPool.Instance(false)?.Spawn(
+                        enemy.transform.position, iaiDamage, PlayerAttackType.Iai, facingRight);
+
+                    Debug.Log($"[PlayerPresenter] 回避居合いダメージ適用: {iaiDamage:F0}");
+                }
+
+                // MeteorDrop中: 5secスタン + 無敵削除 + 大技中断.
+                // 怒り時専用行動中: 5secスタン（行動中断）.
+                // それ以外: 0.5sec IaiStan.
+                bool enemyStunnedLong = false; // MeteorDrop/怒りスタン時はプレイヤー即座に操作復帰.
+                if (enemy != null && enemy.Model is EnemyModel_Wendig wendigModel)
+                {
+                    if (enemy.IsMeteorDropActive)
+                    {
+                        enemyStunnedLong = true;
+                        wendigModel.AbortMeteorDrop();
+                        wendigModel.TriggerMeteorDropStan().Forget();
+                        Debug.Log("[PlayerPresenter] 回避居合い → MeteorDrop中: 5secスタン + 無敵削除 + 大技中断");
+                    }
+                    else if (enemy.IsAngerAction)
+                    {
+                        enemyStunnedLong = true;
+                        wendigModel.TriggerStan().Forget();
+                        Debug.Log("[PlayerPresenter] 回避居合い → 怒り行動Iai: 5secスタン発動（行動中断）");
+                    }
+                    else
+                    {
+                        wendigModel.TriggerIaiStan().Forget();
+                        Debug.Log("[PlayerPresenter] 回避居合い → 敵短スタン発動（パリィ可能攻撃）");
+                    }
+                }
+
+                // 居合いSE再生.
+                guardSEPlayer?.Play("SE_Parry");
+
+                // アニメーション完了を待機（27倍速で~37ms）.
+                float iaiDuration = 1.0f;
+                await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration / 27.0f));
+                playerAnimation?.ClearActionAnimatorSpeed();
+
+                // 回避パリィは素早いカウンターのため短い硬直（0.15sec）.
+                // 長時間スタン時は即復帰.
+                if (!enemyStunnedLong)
+                {
+                    await UniTask.Delay(TimeSpan.FromSeconds(0.15f));
+                }
             }
+            finally
+            {
+                isIaiActive = false;
+                playerAnimation?.ClearActionAnimatorSpeed();
+                playerAnimation?.SetSuppressMovement(false);
+                // 0.3sec後にアイドル復帰（入力がなければ強制遷移）.
+                IdleFallbackAfterParryAsync().Forget();
+            }
+        }
 
-            // 居合いSE再生.
-            guardSEPlayer?.Play("SE_Parry");
-
-            // アニメーション完了を待機.
-            float iaiDuration = 1.0f;
-            await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration / 27.0f));
-            playerAnimation?.ClearActionAnimatorSpeed();
-            await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration - iaiDuration / 27.0f));
-
-            isIaiActive = false;
+        /// <summary>
+        /// パリィ後0.3sec経過しても新しいアクションがなければ強制的にIdle状態に遷移.
+        /// </summary>
+        private async UniTaskVoid IdleFallbackAfterParryAsync()
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(0.3f));
+            // 新しいアクションが開始されていなければアイドルに遷移.
+            if (!playerModel.enableAction && !isIaiActive && !isHeartResisting)
+            {
+                playerAnimation?.ForceIdleState();
+            }
         }
 
         /// <summary>
@@ -810,25 +1165,38 @@ namespace InGame.Player
         /// <param name="attackDuration">攻撃アニメーションの長さ（秒）.</param>
         private async UniTaskVoid ExecuteMeleeAttackAsync(string attackName, float attackDuration = 0.6f)
         {
+            // 移動アニメーション抑制.
+            playerAnimation?.SetSuppressMovement(true);
+
             // 攻撃実行を先に行う（attackCommander内でenableActionをチェックしている可能性があるため）.
             attackCommander.ExecuteAttack(attackName);
             playerModel.SetEnableAction(true);
 
-            // 鼓動ゲージ連動: アニメ速度倍率を反映.
-            float animSpeedRate = pulseModel.GetAnimationSpeedRate();
-            playerAnimation?.SetAnimatorSpeed(animSpeedRate);
+            try
+            {
+                // 1f後に攻撃アニメーション確認.
+                string animTriggerName = attackName == "FirstAttack" ? "NormalAttackDefault" : attackName;
+                playerAnimation?.EnsureAttackAnimation(animTriggerName).Forget();
 
-            // 鼓動ゲージ連動: 入力不可時間に倍率適用.
-            float cooldownRate = pulseModel.GetActionCooldownRate();
-            await UniTask.Delay(TimeSpan.FromSeconds(attackDuration * cooldownRate));
+                // 鼓動ゲージ連動: アニメ速度倍率を反映.
+                float animSpeedRate = pulseModel.GetAnimationSpeedRate();
+                playerAnimation?.SetAnimatorSpeed(animSpeedRate);
 
-            // 終了後0.1秒間を開ける.
-            await UniTask.Delay(TimeSpan.FromSeconds(0.1f));
+                // 鼓動ゲージ連動: 入力不可時間に倍率適用.
+                float cooldownRate = pulseModel.GetActionCooldownRate();
+                await UniTask.Delay(TimeSpan.FromSeconds(attackDuration * cooldownRate));
 
-            // アニメーション速度制御を解除（移動速度による自動調整を再開）.
-            playerAnimation?.ClearActionAnimatorSpeed();
+                // 終了後0.1秒間を開ける.
+                await UniTask.Delay(TimeSpan.FromSeconds(0.1f));
+            }
+            finally
+            {
+                // アニメーション速度制御を解除（移動速度による自動調整を再開）.
+                playerAnimation?.ClearActionAnimatorSpeed();
 
-            playerModel.SetEnableAction(false);
+                playerModel.SetEnableAction(false);
+                if (!isStrongHeartResist) playerAnimation?.SetSuppressMovement(false);
+            }
         }
 
         /// <summary>
@@ -837,6 +1205,9 @@ namespace InGame.Player
         /// <param name="attackDuration">攻撃アニメーションの長さ（秒）.</param>
         private async UniTaskVoid ExecuteJakComboAttackAsync(float attackDuration = 0.33f)
         {
+            // 移動アニメーション抑制.
+            playerAnimation?.SetSuppressMovement(true);
+
             // 重複実行防止のため最初にアクション中フラグを立てる.
             playerModel.SetEnableAction(true);
 
@@ -858,28 +1229,36 @@ namespace InGame.Player
             // コンボカウント増加（次の攻撃用に先に増加）.
             jakComboCount++;
 
-            // 鼓動ゲージ連動: アニメ速度倍率を反映.
-            float animSpeedRate = pulseModel.GetAnimationSpeedRate();
-            playerAnimation?.SetAnimatorSpeed(3.0f * animSpeedRate);
+            try
+            {
+                // 鼓動ゲージ連動: アニメ速度倍率を反映.
+                float animSpeedRate = pulseModel.GetAnimationSpeedRate();
+                playerAnimation?.SetAnimatorSpeed(3.0f * animSpeedRate);
 
-            // 現在のコンボ段階のアニメーション再生.
-            playerAnimation?.PlayTrigger("Jak_" + currentCombo);
-            // 当たり判定とaudioは元のFirstAttackと同一（アニメーションなし）.
-            // コンボ番号を設定してから攻撃実行.
-            attackCommander.SetJakComboNumber(currentCombo);
-            attackCommander.ExecuteAttack("JakComboAttack");
+                // 現在のコンボ段階のアニメーション再生.
+                playerAnimation?.PlayTrigger("Jak_" + currentCombo);
+                // 1f後に攻撃アニメーション確認.
+                playerAnimation?.EnsureAttackAnimation("Jak_" + currentCombo).Forget();
+                // 当たり判定とaudioは元のFirstAttackと同一（アニメーションなし）.
+                // コンボ番号を設定してから攻撃実行.
+                attackCommander.SetJakComboNumber(currentCombo);
+                attackCommander.ExecuteAttack("JakComboAttack");
 
-            // 鼓動ゲージ連動: 入力不可時間に倍率適用.
-            float cooldownRate = pulseModel.GetActionCooldownRate();
-            await UniTask.Delay(TimeSpan.FromSeconds(attackDuration * cooldownRate));
+                // 鼓動ゲージ連動: 入力不可時間に倍率適用.
+                float cooldownRate = pulseModel.GetActionCooldownRate();
+                await UniTask.Delay(TimeSpan.FromSeconds(attackDuration * cooldownRate));
+            }
+            finally
+            {
+                // アニメーション速度制御を解除（移動速度による自動調整を再開）.
+                playerAnimation?.ClearActionAnimatorSpeed();
 
-            // アニメーション速度制御を解除（移動速度による自動調整を再開）.
-            playerAnimation?.ClearActionAnimatorSpeed();
+                // 攻撃終了時刻を記録（ここから1/3秒以内に再入力で次のコンボ）.
+                jakLastAttackTime = UnityEngine.Time.time;
 
-            // 攻撃終了時刻を記録（ここから1/3秒以内に再入力で次のコンボ）.
-            jakLastAttackTime = UnityEngine.Time.time;
-
-            playerModel.SetEnableAction(false);
+                playerModel.SetEnableAction(false);
+                if (!isStrongHeartResist) playerAnimation?.SetSuppressMovement(false);
+            }
         }
 
         /// <summary>
@@ -888,6 +1267,7 @@ namespace InGame.Player
         private async UniTaskVoid ExecutePulseMaxStunAsync()
         {
             isPulseMaxStunning = true;
+            IsPlayerStunning = true;
             stunInterruptedByDamage = false;
             Debug.Log($"[PlayerPresenter] 鼓動200到達 - スタン即時開始 pulse: {pulseModel.GetPulseGauge()}");
 
@@ -963,6 +1343,7 @@ namespace InGame.Player
             // 行動可能に戻す.
             playerModel.SetEnableAction(false);
             isPulseMaxStunning = false;
+            IsPlayerStunning = false;
             stunInterruptedByDamage = false;
         }
 

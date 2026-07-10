@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.ResourceManagement.AsyncOperations;
 using Cysharp.Threading.Tasks;
 using InGame.Player;
 
@@ -39,10 +41,17 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
     private AfterimageEffect afterimageEffect;
     private EnemyModel_Wendig ownerWendigModel;
 
+    // ShockWave (Addressables).
+    private GameObject shockWavePrefab;
+    private AsyncOperationHandle<GameObject> shockWaveHandle;
+
     public EnemState_Wendig_MeteorDrop()
     {
         postActionWaitFrames = 60;
     }
+
+    /// <summary>外部から大技を中断する（居合ヒット時等）.</summary>
+    public void RequestAbort() { isAborted = true; }
 
     protected override async UniTask OnPreAction(EnemyModel_abstract enemyModel)
     {
@@ -73,11 +82,39 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
         animator.SetInteger("Move", 2);
 
         Debug.Log($"[MeteorDrop] OnPreAction開始 - {ownerTransform.gameObject.name}");
+
+        // ShockWave プレハブをAddressablesで読み込み.
+        try
+        {
+            var locHandle = Addressables.LoadResourceLocationsAsync("ShockWave");
+            var locations = await locHandle;
+            Addressables.Release(locHandle);
+            if (locations != null && locations.Count > 0)
+            {
+                shockWaveHandle = Addressables.LoadAssetAsync<GameObject>("ShockWave");
+                shockWavePrefab = await shockWaveHandle;
+                if (shockWaveHandle.Status != AsyncOperationStatus.Succeeded)
+                {
+                    shockWavePrefab = null;
+                    if (shockWaveHandle.IsValid()) Addressables.Release(shockWaveHandle);
+                }
+            }
+        }
+        catch (System.Exception)
+        {
+            shockWavePrefab = null;
+        }
     }
 
     protected override async UniTask OnAction(EnemyModel_abstract enemyModel)
     {
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
+
+        // MeteorDrop中フラグON.
+        if (enemyModel.Presenter != null) enemyModel.Presenter.IsMeteorDropActive = true;
+
+        // 大技専用SE再生.
+        enemyModel.Presenter?.PlaySE("MeteorDrop");
 
         // === Phase1: 退避Rush ===
         Debug.Log("[MeteorDrop] Phase1: 退避Rush開始");
@@ -102,9 +139,8 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
             // 3a. プレイヤー上方にテレポート.
             TeleportAbovePlayer();
 
-            // 少し待機（テレポート直後の安定化）.
-            await UniTask.Delay(200);
-            if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; break; }
+            // 空中で1秒待機してから落下（abort対応: 毎フレーム確認）.
+            if (!await WaitWithAbortCheck(enemyModel, 1000)) break;
 
             // 3b. 急落下.
             await ExecuteFall(enemyModel);
@@ -115,15 +151,54 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
 
             // Y軸制約を復元してからHowling.
             rb.constraints = originalConstraints;
-            if (mainColl != null) mainColl.isTrigger = originalIsTrigger;
 
-            if (ownerWendigModel != null)
             {
-                Debug.Log($"[MeteorDrop] ループ {i + 1}/{loopCount} ハウリング実行");
-                await ownerWendigModel.TriggerHowling();
+                Debug.Log($"[MeteorDrop] ループ {i + 1}/{loopCount} ShockWave + 着地攻撃");
+
+                // ShockWave パーティクル生成.
+                if (shockWavePrefab != null)
+                {
+                    var sw = Object.Instantiate(shockWavePrefab, ownerTransform.position, Quaternion.identity);
+                    sw.transform.localScale = new Vector3(5f, 5f, 1f);
+                    Object.Destroy(sw, 2f);
+                }
+
+                // 着地攻撃通告（パリィ不可）.
+                enemyModel.Presenter.PlayAttackWarning(false);
+
+                // 着地攻撃ダメージ計算.
+                float attackMultiplier = 1.8f;
+                int landingDamage = ownerWendigModel != null
+                    ? (int)(ownerWendigModel.GetCurrentAttackPower() * attackMultiplier)
+                    : 90;
+
+                // 距離ベースダメージ判定（コライダー内側問題を回避）.
+                float damageRadius = 3f;
+                Vector2 damageCenter = (Vector2)ownerTransform.position + new Vector2(0f, 1f);
+                var landingPlayerScope = Object.FindFirstObjectByType<PlayerScope>();
+                if (landingPlayerScope != null)
+                {
+                    float dist = Vector2.Distance(damageCenter, (Vector2)landingPlayerScope.transform.position);
+                    if (dist <= damageRadius)
+                    {
+                        float kbDir = landingPlayerScope.transform.position.x >= ownerTransform.position.x ? 1f : -1f;
+                        var damageData = new InGame.Common.DamageData(
+                            landingDamage, InGame.Common.PowerlevelConst.EnemyHowling, 10f, kbDir);
+                        landingPlayerScope.OnReceiveAttack(damageData);
+                        Debug.Log($"[MeteorDrop] 着地攻撃ヒット (damage={landingDamage}, dist={dist:F2})");
+                    }
+                    else
+                    {
+                        Debug.Log($"[MeteorDrop] 着地攻撃ミス (dist={dist:F2} > {damageRadius})");
+                    }
+                }
             }
 
             if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; break; }
+
+            // 3c2. 着地後地上で1秒待機（abort対応）.
+            Debug.Log($"[MeteorDrop] ループ {i + 1}/{loopCount} 着地後1sec待機");
+            if (!await WaitWithAbortCheck(enemyModel, 1000)) break;
 
             // 3d. 最後のループ以外はジャンプで画面外上部に戻る.
             if (i < loopCount - 1)
@@ -141,8 +216,24 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
 
     protected override async UniTask OnAfterPostAction(EnemyModel_abstract enemyModel)
     {
+        // ShockWave Addressables解放.
+        if (shockWaveHandle.IsValid())
+        {
+            Addressables.Release(shockWaveHandle);
+            shockWavePrefab = null;
+        }
+
+        // 傾きを復元（中断時の安全保証）.
+        if (ownerTransform != null)
+        {
+            ownerTransform.rotation = Quaternion.Euler(0f, ownerTransform.rotation.eulerAngles.y, 0f);
+        }
+
         // 元の状態を復元（常に実行 — クリーンアップ保証）.
         RestoreState();
+
+        // MeteorDrop中フラグOFF.
+        if (enemyModel?.Presenter != null) enemyModel.Presenter.IsMeteorDropActive = false;
 
         if (EnemNullSafetyHelper.IsValid(enemyModel))
         {
@@ -187,9 +278,8 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
         // Rush方向を向く.
         EnemFacingHelper.FaceDirection(ownerTransform, direction);
 
-        // Y軸固定、Colliderをtriggerに.
+        // Y軸固定.
         rb.constraints = originalConstraints | RigidbodyConstraints2D.FreezePositionY;
-        if (mainColl != null) mainColl.isTrigger = true;
         stateModified = true;
         enemyModel.IsJumping = true;
 
@@ -238,11 +328,11 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
 
     private async UniTask ExecuteFall(EnemyModel_abstract enemyModel)
     {
+        if (isAborted) return;
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
         // Y軸制約解除（落下のため）.
         rb.constraints = originalConstraints & ~RigidbodyConstraints2D.FreezePositionY;
-        if (mainColl != null) mainColl.isTrigger = true;
         enemyModel.IsJumping = true;
 
         // 空中状態アニメーション.
@@ -255,38 +345,42 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
         // 下向き初速を与える.
         rb.linearVelocity = new Vector2(0f, -fallInitialSpeed);
 
-        // 着地タイミング計算.
-        float gravity = Mathf.Abs(Physics2D.gravity.y * rb.gravityScale);
-        if (gravity < 0.1f) gravity = 9.81f;
+        // 落下中は85度傾ける（頭を下方向 = ダイブ姿勢）.
+        float yRot = ownerTransform.rotation.eulerAngles.y;
+        float zTilt = yRot < 90f ? -85f : 85f;
+        ownerTransform.rotation = Quaternion.Euler(0f, yRot, zTilt);
 
-        // h = v0*t + 0.5*g*t^2 → t = (-v0 + sqrt(v0^2 + 2*g*h)) / g
-        float v0 = fallInitialSpeed;
-        float fallTime = (-v0 + Mathf.Sqrt(v0 * v0 + 2f * gravity * teleportHeight)) / gravity;
-
-        // 計算上の着地時間の70%まで待ってから地面チェック開始.
-        float checkStartTime = fallTime * 0.7f;
-        await UniTask.Delay((int)(checkStartTime * 1000));
-
-        if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
-
-        // 地面検知ループ.
+        // 地面検知ループ（毎フレームレイキャスト — 時間ベース待機は使わない）.
         bool landed = false;
-        float timeout = fallTime * 2f;
-        float elapsed = checkStartTime;
+        float timeout = 5f;
+        float elapsed = 0f;
 
         while (!landed && elapsed < timeout)
         {
+            if (isAborted) { rb.linearVelocity = Vector2.zero; return; }
             if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
-            Vector2 feetPos = GetFeetPosition(enemyModel);
-            RaycastHit2D hit = Physics2D.Raycast(feetPos, Vector2.down, groundCheckDistance, groundLayerMask);
+            // 回転中はcol.boundsが不正確なため、transform.positionベースで検出.
+            // 上方オフセット付きレイキャストで地面に食い込んでいても検出可能.
+            float upOffset = 1.0f;
+            Vector2 rayOrigin = (Vector2)ownerTransform.position + Vector2.up * upOffset;
+
+            // 落下速度に応じてレイキャスト距離を拡大（高速落下時の地面貫通防止）.
+            float fallSpeed = Mathf.Abs(rb.linearVelocity.y);
+            float dynamicCheckDist = Mathf.Max(groundCheckDistance + upOffset, fallSpeed * Time.deltaTime * 3f + upOffset);
+
+            RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.down, dynamicCheckDist, groundLayerMask);
             if (hit.collider != null)
             {
                 landed = true;
                 rb.linearVelocity = Vector2.zero;
 
-                // 着地位置補正（足元を地面に合わせる）.
-                float feetOffset = feetPos.y - ownerTransform.position.y;
+                // 傾きを復元.
+                ownerTransform.rotation = Quaternion.Euler(0f, ownerTransform.rotation.eulerAngles.y, 0f);
+
+                // 着地位置補正（回転解除後の正しい足元位置で計算）.
+                Vector2 correctedFeetPos = GetFeetPosition(enemyModel);
+                float feetOffset = correctedFeetPos.y - ownerTransform.position.y;
                 ownerTransform.position = new Vector3(
                     ownerTransform.position.x,
                     hit.point.y - feetOffset,
@@ -302,6 +396,8 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
         {
             Debug.LogWarning("[MeteorDrop] 着地タイムアウト - 強制着地");
             rb.linearVelocity = Vector2.zero;
+            // 傾きを復元.
+            ownerTransform.rotation = Quaternion.Euler(0f, ownerTransform.rotation.eulerAngles.y, 0f);
             ownerTransform.position = new Vector3(
                 ownerTransform.position.x,
                 enemyModel.StageMin.y,
@@ -323,11 +419,11 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
 
     private async UniTask JumpBackUp(EnemyModel_abstract enemyModel)
     {
+        if (isAborted) return;
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
         // Y軸制約解除.
         rb.constraints = originalConstraints & ~RigidbodyConstraints2D.FreezePositionY;
-        if (mainColl != null) mainColl.isTrigger = true;
         enemyModel.IsJumping = true;
 
         // 空中アニメーション.
@@ -346,6 +442,7 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
 
         while (elapsed < safetyTimeout)
         {
+            if (isAborted) { rb.linearVelocity = Vector2.zero; return; }
             if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
             Vector3 vp = Camera.main.WorldToViewportPoint(ownerTransform.position);
@@ -360,6 +457,24 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
     }
 
     // === ヘルパー ===
+
+    /// <summary>
+    /// abort対応の待機: 毎フレームisAbortedとValidityを確認しながらrealtime基準で待機.
+    /// timeScale=0でも正常に動作する.
+    /// </summary>
+    private async UniTask<bool> WaitWithAbortCheck(EnemyModel_abstract enemyModel, int milliseconds)
+    {
+        float waitSec = milliseconds / 1000f;
+        float elapsed = 0f;
+        while (elapsed < waitSec)
+        {
+            if (isAborted) return false;
+            if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return false; }
+            await UniTask.Yield();
+            elapsed += Time.unscaledDeltaTime;
+        }
+        return true;
+    }
 
     private Vector2 GetFeetPosition(EnemyModel_abstract enemyModel)
     {
@@ -378,10 +493,6 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
         {
             rb.constraints = originalConstraints;
             rb.linearVelocity = Vector2.zero;
-        }
-        if (mainColl != null)
-        {
-            mainColl.isTrigger = originalIsTrigger;
         }
         stateModified = false;
     }

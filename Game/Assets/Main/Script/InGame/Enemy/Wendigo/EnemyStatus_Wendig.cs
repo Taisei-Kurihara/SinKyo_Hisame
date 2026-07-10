@@ -72,11 +72,13 @@ public class EnemyStatus_Wendig : EnemyStatus_abstract
 
     protected override async UniTask Dead()
     {
+        if (IsDead) return;
         Debug.Log($"[EnemyStatus_Wendig] Dead開始 - DeadState使用 - {gameObject.name}");
 
         // EnemyModel_WendigのTriggerDeadを使用.
         if (wendigModel != null)
         {
+            await base.Dead();
             await wendigModel.TriggerDead();
         }
         else

@@ -34,7 +34,7 @@ public class EnemState_Wendig_Howling : EnemState_abstract
         // Howlingアニメーション開始.
         enemyModel.Animator.SetTrigger("Howling");
 
-        // === 前段階 ===.
+        // === 前段階 ===（パリィ不可攻撃）.
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
             enemyModel, 500f, false, 300f, animSpeed)) { isAborted = true; return; }
     }

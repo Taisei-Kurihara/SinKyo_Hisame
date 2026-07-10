@@ -1,4 +1,5 @@
 using System;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace InGame.Player.Animation
@@ -27,6 +28,9 @@ namespace InGame.Player.Animation
         // アクション（攻撃等）がanimator.speedを制御中かどうか.
         private bool actionSpeedOverride = false;
 
+        // 攻撃中やHeartResist強中に移動アニメーション遷移を抑制するフラグ.
+        private bool suppressMovementAnim = false;
+
         // 基準歩行速度（PlayerStatusInitModel.speed）. 移動アニメ速度の正規化に使用.
         private const float baseWalkSpeed = 7f;
 
@@ -37,12 +41,15 @@ namespace InGame.Player.Animation
             rb = gameObject.GetComponent<Rigidbody2D>();
         }
 
+        private bool isDead = false;
+
         /// <summary>
         /// LateUpdate: 他スクリプトの方向変更より後に実行し、方向の最終決定権を保証.
         /// git merge等で旧コードが復活しても、ここが最後に上書きするため二重反転を防止.
         /// </summary>
         public void LateUpdate()
         {
+            if (isDead) return;
             SetMove(rb.linearVelocityX);
         }
 
@@ -69,6 +76,8 @@ namespace InGame.Player.Animation
             if (_move > moveDeadZone) { moveState = 1; }
             else if (_move < -moveDeadZone) { moveState = -1; }
 
+            // 移動アニメ抑制中は常にIdle.
+            if (suppressMovementAnim) moveState = 0;
             animator.SetInteger(IsMoveHash, moveState);
 
             // 移動速度に応じてアニメーション速度を変更（アクション中は除外）.
@@ -202,6 +211,68 @@ namespace InGame.Player.Animation
         }
 
         /// <summary>
+        /// 移動アニメーション抑制を設定.
+        /// 攻撃中やHeartResist強中にMoveパラメータを強制0にする.
+        /// </summary>
+        public void SetSuppressMovement(bool suppress)
+        {
+            suppressMovementAnim = suppress;
+            if (suppress && animator != null)
+                animator.SetInteger(IsMoveHash, 0);
+        }
+
+        /// <summary>
+        /// suppressMovementAnim有効中、毎フレームアニメーターの状態を確認し、
+        /// 移動系に遷移していたら攻撃トリガーを再発火する.
+        /// 攻撃アニメーション確認後は再発火せず、完了時に監視終了.
+        /// </summary>
+        public async UniTask EnsureAttackAnimation(string triggerName)
+        {
+            // 最大監視フレーム数（無限ループ防止）.
+            int maxFrames = 120;
+            bool animationConfirmed = false;
+            for (int i = 0; i < maxFrames; i++)
+            {
+                await UniTask.Yield();
+                if (animator == null) return;
+                // suppress解除されたら監視終了.
+                if (!suppressMovementAnim) return;
+                var info = animator.GetCurrentAnimatorStateInfo(0);
+                bool isInMovementState = info.IsName("Idle") || info.IsName("Walk") || info.IsName("Run");
+
+                if (!animationConfirmed)
+                {
+                    // 攻撃アニメーション未確認: 移動系なら再発火.
+                    if (isInMovementState)
+                    {
+                        animator.SetTrigger(triggerName);
+                    }
+                    else
+                    {
+                        // 攻撃アニメーション確認済み → 以降は再発火しない.
+                        animationConfirmed = true;
+                    }
+                }
+                else
+                {
+                    // 確認済み: アニメーション完了して移動系に復帰 → 監視終了.
+                    if (isInMovementState) return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// アニメーターを強制的にIdle状態にする.
+        /// パリィ後等でアニメーションが停滞した場合のフォールバック.
+        /// </summary>
+        public void ForceIdleState()
+        {
+            if (animator == null) return;
+            animator.SetInteger(IsMoveHash, 0);
+            animator.Play("Idle", 0, 0f);
+        }
+
+        /// <summary>
         /// アクション用アニメーション速度を設定（移動速度による自動調整を一時停止）.
         /// </summary>
         /// <param name="speed">速度倍率（1.0が通常速度）.</param>
@@ -217,6 +288,40 @@ namespace InGame.Player.Animation
         public void ClearActionAnimatorSpeed()
         {
             actionSpeedOverride = false;
+            // 即座にanimator.speedを通常速度に復元（次Updateまでの遅延を防止）.
+            if (animator != null)
+                animator.speed = 1.0f;
+        }
+
+        /// <summary>
+        /// 死亡通知: 以降の歩き/アイドル/着地アニメーション遷移を停止し、着地判定を即座に解除.
+        /// </summary>
+        public void NotifyDead()
+        {
+            isDead = true;
+            animator.SetInteger(IsMoveHash, 0);
+            animator.SetBool(IsGroundedHash, false);
+        }
+
+        // 居合ワーニング用アニメーター（Inspector上で設定）.
+        [Header("居合ワーニング")]
+        [SerializeField] private Animator iaiWarningAnimator;
+
+        /// <summary>
+        /// 居合発動可能ワーニングの開始/停止.
+        /// </summary>
+        public void SetIaiWarning(bool active)
+        {
+            if (iaiWarningAnimator == null) return;
+            if (active)
+            {
+                iaiWarningAnimator.gameObject.SetActive(true);
+                iaiWarningAnimator.SetTrigger("Start");
+            }
+            else
+            {
+                iaiWarningAnimator.SetTrigger("Stop");
+            }
         }
     }
 
@@ -235,7 +340,12 @@ namespace InGame.Player.Animation
         void PlayTrigger(string triggerName);
         void RegisterHitDetectionCallbacks(Action onStart, Action onEnd);
         void ClearHitDetectionCallbacks();
+        void SetSuppressMovement(bool suppress);
+        UniTask EnsureAttackAnimation(string triggerName);
         void SetAnimatorSpeed(float speed);
         void ClearActionAnimatorSpeed();
+        void NotifyDead();
+        void SetIaiWarning(bool active);
+        void ForceIdleState();
     }
 }

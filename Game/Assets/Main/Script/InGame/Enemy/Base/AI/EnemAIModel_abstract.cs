@@ -146,6 +146,15 @@ public abstract class EnemAIModel_abstract
             return;
         }
 
+        // SE初期化完了を待機（最大30フレーム）.
+        int seWaitCount = 0;
+        while (!ownerModel.Presenter.IsSEReady && seWaitCount < 30)
+        {
+            if (token.IsCancellationRequested) return;
+            await UniTask.Yield(token);
+            seWaitCount++;
+        }
+
         Debug.Log($"[EnemAIModel_abstract] AILoop - 初期化完了、ループ開始");
 
         // Updaterが設定されている場合はUpdaterに委譲（切り替えループ対応）.

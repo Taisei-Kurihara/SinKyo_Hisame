@@ -71,12 +71,9 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         originalConstraints = rb.constraints;
         originalIsTrigger = mainColl != null ? mainColl.isTrigger : false;
 
-        // 突進中はY軸固定とコライダーをトリガーに設定（すり抜け用）.
+        // 突進中はY軸固定 + isTrigger化（プレイヤーをすり抜ける）.
         rb.constraints = originalConstraints | RigidbodyConstraints2D.FreezePositionY;
-        if (mainColl != null)
-        {
-            mainColl.isTrigger = true;
-        }
+        if (mainColl != null) mainColl.isTrigger = true;
         stateModified = true;
 
         Vector2 currentPos = ownerTransform.position;

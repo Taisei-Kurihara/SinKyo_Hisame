@@ -41,8 +41,11 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Blend: 0.0026855469
+    - _Blend: 0
     - _EnableExternalAlpha: 0
+    - _FillEnabled: 0
+    - _FillThreshold: 0.01
+    - _GrayscaleRatio: 0.0033917427
     - _ZWrite: 0
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}

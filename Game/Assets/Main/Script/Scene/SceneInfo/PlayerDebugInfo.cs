@@ -29,6 +29,9 @@ namespace SceneInfo
             // ダメージカウンタープール初期化.
             await DamageCounterPool.Instance(false).InitPool("DamageCounter");
 
+            // 血痕エフェクトプール初期化.
+            await BloodSplatterPool.Instance(false).InitPool("BloodSplatter");
+
             // プレイヤーエフェクトプール初期化（スタン:1個、回復:3個）.
             var playerEffectPool = PlayerEffectPool.Instance(false);
             await playerEffectPool.InitPool("PlayerEffect_Stun", 1);

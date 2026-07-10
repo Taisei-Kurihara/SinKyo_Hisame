@@ -35,8 +35,10 @@ public class EnemInterruptState_Bayt_Wendig : EnemInterruptState_abstract
         animator.SetTrigger("Bayt");
 
         // === 前段階 ===.
+        // 予兆リードタイム800ms: 警告が攻撃の800ms前(700ms時点)に表示される.
+        // (MeleeAttackと同等のパリィタイミング).
         if (!await EnemAttackPhaseHelper.PlayAttackPremonition(
-            enemyModel, 1500f, true, 300f, animSpeed)) return;
+            enemyModel, 1500f, true, 800f, animSpeed)) return;
 
         // === 攻撃中 ===.
         // 攻撃判定を400ms維持.

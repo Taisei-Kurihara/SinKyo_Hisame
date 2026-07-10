@@ -4,6 +4,7 @@ using InGame;
 using InGame.Enemy;
 using InGame.Player;
 using Setting;
+using Tutorial;
 using UnityEngine;
 
 namespace SceneInfo
@@ -32,6 +33,9 @@ namespace SceneInfo
             // ダメージカウンタープール初期化.
             await DamageCounterPool.Instance(false).InitPool("DamageCounter");
 
+            // 血痕エフェクトプール初期化.
+            await BloodSplatterPool.Instance(false).InitPool("BloodSplatter");
+
             // プレイヤーエフェクトプール初期化（スタン:1個、回復:3個）.
             var playerEffectPool = PlayerEffectPool.Instance(false);
             await playerEffectPool.InitPool("PlayerEffect_Stun", 1);
@@ -39,6 +43,9 @@ namespace SceneInfo
             await playerEffectPool.InitPool("UP", 2);
             await playerEffectPool.InitPool("Down", 2);
             Debug.Log("[MainSceneInfo] エフェクトプール初期化完了 → BGM読み込み開始");
+
+            // ゲーム中はチュートリアルウィンドウを非表示で開始.
+            TutorialManager.Instance(false)?.HideTutorial();
 
             // BGM再生（ビルド版ではawaitしないとAddressables読み込み完了前にフローが終了する）.
             await AudioManager.Instance().LoadBgm("BGM_BaseHome");

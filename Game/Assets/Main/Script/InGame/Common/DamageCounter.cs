@@ -178,14 +178,14 @@ namespace InGame
         {
             IDamageCounterShakeSettings settings = this;
 
-            // スケール 0→1.
-            transform.localScale = Vector3.zero;
+            // スケール 0→1（Z軸は1固定）.
+            transform.localScale = new Vector3(0f, 0f, 1f);
             scaleHandle = LMotion.Create(0f, 1f, settings.ScaleUpDuration)
                 .WithEase(Ease.OutBack)
                 .Bind(v =>
                 {
                     if (!hitTerrain)
-                        transform.localScale = Vector3.one * v;
+                        transform.localScale = new Vector3(v, v, 1f);
                 });
 
             // 左右振動（Canvas子オブジェクトに適用）.
@@ -248,6 +248,7 @@ namespace InGame
                     Vector3 pos = transform.position;
                     pos.x += velocity.x * dt;
                     pos.y += velocity.y * dt;
+                    pos.z = 0f; // Z軸移動禁止.
                     transform.position = pos;
                 }
             }
@@ -258,6 +259,7 @@ namespace InGame
                 Vector3 pos = transform.position;
                 pos.x += velocity.x * dt;
                 pos.y += velocity.y * dt;
+                pos.z = 0f; // Z軸移動禁止.
                 transform.position = pos;
             }
 
@@ -280,7 +282,9 @@ namespace InGame
             shrinkElapsed += Time.deltaTime;
             float t = Mathf.Clamp01(shrinkElapsed / shrinkDuration);
 
-            transform.localScale = Vector3.Lerp(shrinkStartScale, Vector3.zero, t);
+            // Z軸は1固定で XY のみ縮小.
+            float xy = Mathf.Lerp(shrinkStartScale.x, 0f, t);
+            transform.localScale = new Vector3(xy, xy, 1f);
 
             if (t >= 1f)
             {
@@ -317,6 +321,9 @@ namespace InGame
         {
             if (hitTerrain) return;
 
+            // トリガー（攻撃判定など）には反応しない.
+            if (other.isTrigger) return;
+
             // Platformレイヤーチェック.
             if (((1 << other.gameObject.layer) & platformLayerMask) == 0) return;
 
@@ -339,6 +346,8 @@ namespace InGame
                 // hit対象に親子付け.
                 transform.SetParent(other.transform);
 
+                // 血痕エフェクトをスポーン.
+                BloodSplatterPool.Instance(false)?.Spawn(hitPoint, dir, normal);
             }
             else
             {
@@ -346,6 +355,8 @@ namespace InGame
                 hitPoint = transform.position;
                 transform.SetParent(other.transform);
 
+                // 血痕エフェクト（法線不明のためVector2.upを使用）.
+                BloodSplatterPool.Instance(false)?.Spawn(hitPoint, dir, Vector2.up);
             }
 
             // スケールモーションをキャンセル（縮小に切り替え）.

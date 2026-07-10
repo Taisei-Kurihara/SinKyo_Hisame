@@ -69,8 +69,7 @@ namespace InGame
         /// <param name="position">表示位置 (World Space).</param>
         /// <param name="direction">DamageCounterの進行方向.</param>
         /// <param name="normal">地形法線方向.</param>
-        /// <param name="parentTarget">親子付け対象のTransform.</param>
-        public void Spawn(Vector3 position, Vector2 direction, Vector2 normal, Transform parentTarget)
+        public void Spawn(Vector3 position, Vector2 direction, Vector2 normal)
         {
             if (!isInitialized) return;
 
@@ -84,15 +83,11 @@ namespace InGame
                 pool.Add(obj);
             }
 
-            // 親子がterrain等に変わっている場合、一旦Pool配下に戻す.
-            if (obj.transform.parent != transform)
-                obj.transform.SetParent(transform);
-
             obj.transform.position = new Vector3(position.x, position.y, 0f);
             obj.SetActive(true);
 
             var splatter = obj.GetComponent<BloodSplatter>();
-            splatter?.Initialize(direction, normal, parentTarget);
+            splatter?.Initialize(direction, normal);
         }
 
         /// <summary>
