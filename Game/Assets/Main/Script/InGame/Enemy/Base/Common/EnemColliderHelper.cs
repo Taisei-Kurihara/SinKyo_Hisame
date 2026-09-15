@@ -59,14 +59,17 @@ public static class EnemColliderHelper
         // ヒット検出用コンポーネントを追加.
         EnemyAttackHitDetector hitDetector = AttachDetector(ownerTransform, config.colliderState, createdColliders);
 
-        // 持続時間待機.
-        await UniTask.Delay((int)(durationMs / animSpeed));
-
-        // 破棄.
-        CleanupColliders(colliderStatus, hitDetector);
-
-        // レイヤー復元.
-        RestoreLayer(ownerTransform, originalLayer);
+        try
+        {
+            // 持続時間待機.
+            await UniTask.Delay((int)(durationMs / animSpeed));
+        }
+        finally
+        {
+            // 破棄（例外・キャンセル時も確実に実行）.
+            CleanupColliders(colliderStatus, hitDetector);
+            RestoreLayer(ownerTransform, originalLayer);
+        }
 
         return EnemNullSafetyHelper.IsValid(enemyModel);
     }
@@ -98,17 +101,20 @@ public static class EnemColliderHelper
         // ヒット検出用コンポーネントを追加.
         EnemyAttackHitDetector hitDetector = AttachDetector(ownerTransform, config.colliderState, createdColliders);
 
-        // 1フレーム待ってから条件チェック開始.
-        await UniTask.Yield();
+        try
+        {
+            // 1フレーム待ってから条件チェック開始.
+            await UniTask.Yield();
 
-        // 完了条件まで待機.
-        await UniTask.WaitUntil(completionPredicate);
-
-        // 破棄.
-        CleanupColliders(colliderStatus, hitDetector);
-
-        // レイヤー復元.
-        RestoreLayer(ownerTransform, originalLayer);
+            // 完了条件まで待機.
+            await UniTask.WaitUntil(completionPredicate);
+        }
+        finally
+        {
+            // 破棄（例外・キャンセル時も確実に実行）.
+            CleanupColliders(colliderStatus, hitDetector);
+            RestoreLayer(ownerTransform, originalLayer);
+        }
 
         return EnemNullSafetyHelper.IsValid(enemyModel);
     }

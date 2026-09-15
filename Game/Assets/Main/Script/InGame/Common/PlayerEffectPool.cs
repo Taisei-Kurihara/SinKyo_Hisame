@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceLocations;
 using Cysharp.Threading.Tasks;
 using Common;
 
@@ -43,6 +44,18 @@ namespace InGame
 
             try
             {
+                // Addressablesにキーが登録されているか事前確認.
+                var locHandle = Addressables.LoadResourceLocationsAsync(effectAddress, typeof(GameObject));
+                IList<IResourceLocation> locations = await locHandle;
+                bool exists = locations != null && locations.Count > 0;
+                Addressables.Release(locHandle);
+
+                if (!exists)
+                {
+                    pools.Remove(effectAddress);
+                    return;
+                }
+
                 data.prefabHandle = Addressables.LoadAssetAsync<GameObject>(effectAddress);
                 data.loadedPrefab = await data.prefabHandle;
 
@@ -73,9 +86,10 @@ namespace InGame
                 data.isInitialized = true;
                 Debug.Log($"[PlayerEffectPool] プール初期化完了 - '{effectAddress}' x{poolSize}");
             }
-            catch (System.Exception e)
+            catch (System.Exception)
             {
-                Debug.LogWarning($"[PlayerEffectPool] エフェクト '{effectAddress}' の読み込み中にエラー: {e.GetType().Name}: {e.Message}");
+                // Addressablesキー未登録等のエラーはサイレントスキップ.
+                pools.Remove(effectAddress);
             }
         }
 
@@ -126,15 +140,23 @@ namespace InGame
                 ps.Play(true);
             }
 
+            // Spawn位置と追従対象の差分をオフセットとして保持.
+            Vector3 followOffset = Vector3.zero;
+            if (followTarget != null)
+            {
+                followOffset = position - followTarget.position;
+                followOffset.z = 0f;
+            }
+
             if (loop)
             {
                 // ループ時はStopAllまで追従のみ行い、自動返却しない.
-                FollowUntilStopped(obj, followTarget).Forget();
+                FollowUntilStopped(obj, followTarget, followOffset).Forget();
             }
             else
             {
                 // パーティクル終了後に自動返却（追従あり）.
-                ReturnAfterEffect(obj, ps, followTarget).Forget();
+                ReturnAfterEffect(obj, ps, followTarget, followOffset).Forget();
             }
         }
 
@@ -142,7 +164,7 @@ namespace InGame
         /// パーティクルシステムの再生完了後にプールへ返却.
         /// 追従先がある場合は毎フレーム位置を更新する.
         /// </summary>
-        private async UniTaskVoid ReturnAfterEffect(GameObject obj, ParticleSystem ps, Transform followTarget)
+        private async UniTaskVoid ReturnAfterEffect(GameObject obj, ParticleSystem ps, Transform followTarget, Vector3 followOffset)
         {
             float waitTime = 1f;
             if (ps != null)
@@ -155,10 +177,11 @@ namespace InGame
             {
                 if (obj == null) return;
 
-                // 追従対象がある場合は位置を更新.
+                // 追従対象がある場合はオフセット付きで位置を更新.
                 if (followTarget != null)
                 {
-                    obj.transform.position = new Vector3(followTarget.position.x, followTarget.position.y, 0f);
+                    Vector3 targetPos = followTarget.position + followOffset;
+                    obj.transform.position = new Vector3(targetPos.x, targetPos.y, 0f);
                 }
 
                 elapsed += Time.deltaTime;
@@ -174,13 +197,14 @@ namespace InGame
         /// <summary>
         /// ループエフェクト用: StopAllで非アクティブにされるまで追従のみ行う.
         /// </summary>
-        private async UniTaskVoid FollowUntilStopped(GameObject obj, Transform followTarget)
+        private async UniTaskVoid FollowUntilStopped(GameObject obj, Transform followTarget, Vector3 followOffset)
         {
             while (obj != null && obj.activeInHierarchy)
             {
                 if (followTarget != null)
                 {
-                    obj.transform.position = new Vector3(followTarget.position.x, followTarget.position.y, 0f);
+                    Vector3 targetPos = followTarget.position + followOffset;
+                    obj.transform.position = new Vector3(targetPos.x, targetPos.y, 0f);
                 }
                 await UniTask.Yield(cancellationToken: this.destroyCancellationToken);
             }

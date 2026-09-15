@@ -1,5 +1,6 @@
 using UnityEngine;
 using Common;
+using InGame.Common;
 using UnityEngine.UI;
 using Unity.VisualScripting;
 using TMPro;
@@ -10,7 +11,7 @@ namespace SceneEventer
     /// <summary>
     /// Eventer
     /// </summary>
-    public class KeyConfigEventer : ButtonEventer
+    public class KeyConfigEventer : MenuButtonEventer
     {
         //KeyConfig config=new KeyConfig();
 
@@ -37,6 +38,10 @@ namespace SceneEventer
         [SerializeField] private TextMeshProUGUI guardText;
 
 
+        // buttonsSlot 実装（abstract 強制）.
+        private ButtonSlotDictionary _buttonsSlot;
+        protected override ButtonSlotDictionary buttonsSlot => _buttonsSlot;
+
         KeyConfig keyConfig = new KeyConfig();
         protected override void Init()
         {
@@ -44,47 +49,30 @@ namespace SceneEventer
 
             //テキスト全部初期化
             SetTextInitializeKeyBoard();
-            buttons = new Button[][]
+
+            _buttonsSlot = new ButtonSlotDictionary()
             {
-                    new Button[]{firstAttackKeySelect},
-                    new Button[]{secondAttackKeySelect},
-                    new Button[]{restrainAttackSelect},
-                    new Button[]{specialAttackSelect},
-                    new Button[]{dodge},
-                    new Button[]{jump},
-                    new Button[]{heal},
-                    new Button[]{guard}
+                { (MenuButtonIndex)0, 0, FirstAttackEvent    },
+                { (MenuButtonIndex)1, 1, SecondAttackEvent   },
+                { (MenuButtonIndex)2, 2, RestrainAttackEvent },
+                { (MenuButtonIndex)3, 3, SpecialAttackEvent  },
+                { (MenuButtonIndex)4, 4, DodgeEvent          },
+                { (MenuButtonIndex)5, 5, JumpEvent           },
+                { (MenuButtonIndex)6, 6, HealEvent           },
+                { (MenuButtonIndex)7, 7, GuardEvent          },
             };
-        }
-        protected override void ButtonEvents(Button button)
-        {
-            switch (button)
+
+            buttons = new MenuButton[][]
             {
-                case var _ when button == firstAttackKeySelect:
-                    FirstAttackEvent();
-                    break;
-                case var _ when button == secondAttackKeySelect:
-                    SecondAttackEvent();
-                    break;
-                case var _ when button == restrainAttackSelect:
-                    RestrainAttackEvent();
-                    break;
-                case var _ when button == specialAttackSelect:
-                    SpecialAttackEvent();
-                    break;
-                case var _ when button == dodge:
-                    DodgeEvent();
-                    break;
-                case var _ when button == jump:
-                    JumpEvent();
-                    break;
-                case var _ when button == heal:
-                    HealEvent();
-                    break;
-                case var _ when button == guard:
-                    GuardEvent();
-                    break;
-            }
+                new MenuButton[]{ new MenuButton{ button = firstAttackKeySelect, index = (MenuButtonIndex)0 } },
+                new MenuButton[]{ new MenuButton{ button = secondAttackKeySelect, index = (MenuButtonIndex)1 } },
+                new MenuButton[]{ new MenuButton{ button = restrainAttackSelect, index = (MenuButtonIndex)2 } },
+                new MenuButton[]{ new MenuButton{ button = specialAttackSelect, index = (MenuButtonIndex)3 } },
+                new MenuButton[]{ new MenuButton{ button = dodge, index = (MenuButtonIndex)4 } },
+                new MenuButton[]{ new MenuButton{ button = jump, index = (MenuButtonIndex)5 } },
+                new MenuButton[]{ new MenuButton{ button = heal, index = (MenuButtonIndex)6 } },
+                new MenuButton[]{ new MenuButton{ button = guard, index = (MenuButtonIndex)7 } },
+            };
         }
 
         public void FirstAttackEvent()

@@ -1,5 +1,6 @@
 using Common;
 using Cysharp.Threading.Tasks;
+using InGame.Common;
 using SceneInfo;
 using System.Collections.Generic;
 using UnityEngine;
@@ -16,7 +17,7 @@ namespace SceneEventer
         Window = 2
     }
 
-    public class SettingEventer : ButtonEventer
+    public class SettingEventer : MenuButtonEventer
     {
         // Addressableで読み込んだリソースのハンドル管理（List化）
         private List<AsyncOperationHandle<GameObject>> currentSettingHandles = new List<AsyncOperationHandle<GameObject>>();
@@ -35,41 +36,24 @@ namespace SceneEventer
         //ボタンクールタイム用
         private CoolTime CoolTimeButton;
 
-        //ここで全ての処理のボタン押したらっていう処理を書く
-        protected override void ButtonEvents(Button button)
-        {
-            switch (button)
-            {
-                case var _ when button == Game:
-                    // ゲーム設定画面への遷移処理
-                    LoadAndDisplaySettings(SettingType.Game).Forget();
-                    break;
-                case var _ when button == Audio:
-                    // オーディオ設定画面への遷移処理
-                    LoadAndDisplaySettings(SettingType.Audio).Forget();
-                    break;
-                case var _ when button == Window:
-                    // ウィンドウ設定画面への遷移処理
-                    LoadAndDisplaySettings(SettingType.Window).Forget();
-                    break;
-                case var _ when button == Back:
-                    // キャンセル処理
-                    CancelSettings();
-                    break;
-                case var _ when button == Save:
-                    // 設定の保存処理
-                    SaveSettings();
-                    break;
-            }
-        }
+        // buttonsSlot 実装（abstract 強制）.
+        private ButtonSlotDictionary _buttonsSlot;
+        protected override ButtonSlotDictionary buttonsSlot => _buttonsSlot;
 
         protected override void Init()
         {
-            buttons = new Button[][]
+            _buttonsSlot = new ButtonSlotDictionary()
             {
-                    new Button[]{Game},
-                    new Button[]{Audio},
-                    new Button[]{Window}
+                { (MenuButtonIndex)0, 0, () => LoadAndDisplaySettings(SettingType.Game).Forget()  },
+                { (MenuButtonIndex)1, 1, () => LoadAndDisplaySettings(SettingType.Audio).Forget() },
+                { (MenuButtonIndex)2, 2, () => LoadAndDisplaySettings(SettingType.Window).Forget() },
+            };
+
+            buttons = new MenuButton[][]
+            {
+                new MenuButton[]{ new MenuButton{ button = Game,   index = (MenuButtonIndex)0 } },
+                new MenuButton[]{ new MenuButton{ button = Audio,  index = (MenuButtonIndex)1 } },
+                new MenuButton[]{ new MenuButton{ button = Window, index = (MenuButtonIndex)2 } },
             };
         }
 

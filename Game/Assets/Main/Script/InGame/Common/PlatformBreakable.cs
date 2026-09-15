@@ -55,6 +55,17 @@ namespace InGame.Common
             }
         }
 
+        /// <summary>
+        /// 外部から破壊を発動する（MeteorDrop着地時等）.
+        /// </summary>
+        /// <param name="impactX">衝撃元のX座標（傾き方向の決定に使用）.</param>
+        public void TriggerBreak(float impactX)
+        {
+            if (isBreaking) return;
+            float tiltDir = impactX > transform.position.x ? -1f : 1f;
+            BreakSequenceAsync(tiltDir).Forget();
+        }
+
         private async UniTaskVoid BreakSequenceAsync(float tiltDir)
         {
             isBreaking = true;

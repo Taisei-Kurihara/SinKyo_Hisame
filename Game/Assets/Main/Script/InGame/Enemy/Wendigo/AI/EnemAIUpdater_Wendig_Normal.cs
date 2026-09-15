@@ -49,6 +49,9 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
     // 連続攻撃防止用.
     private int lastMeleeAttackType = -1;
 
+    // ジャンプ切連続使用制限: 直前の攻撃がジャンプ切だった場合true.
+    private bool lastActionWasJumpSlash = false;
+
     // 基本移動速度.
     private const float baseMoveSpeed = 3f;
     private const float baseApproachSpeed = 4.8f;
@@ -72,6 +75,7 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
         pendingAngerHowling = false;
         meleeAttacksSinceLastRush = 0;
         lastMeleeAttackType = -1;
+        lastActionWasJumpSlash = false;
         // 怒りゲージリセット.
         angerGauge = 0f;
         isAngry = false;
@@ -204,13 +208,35 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
 
             if (selectedSetting.actionState is EnemState_Wendig_JumpSlash jumpSlash)
             {
+                if (lastActionWasJumpSlash)
+                {
+                    // ジャンプ切連続使用制限: Howlingで代替（待機0）.
+                    if (ownerModel is EnemyModel_Wendig wendigModelJsReplace)
+                    {
+                        Debug.Log("[WendigNormalUpdater] ジャンプ切連続 → Howling代替(待機0)");
+                        var howling = WendigMasterAI.HowlingState;
+                        int origWait = howling.PostActionWaitFrames;
+                        howling.PostActionWaitFrames = 0;
+                        await wendigModelJsReplace.TriggerHowling();
+                        howling.PostActionWaitFrames = origWait;
+                    }
+                    lastActionWasJumpSlash = false;
+                    randomMoveCount = 0;
+                    currentActionSetting = null;
+                    return;
+                }
+
                 jumpSlash.SetTargetPosition(targetPos);
                 await selectedSetting.actionState.Act(ownerModel);
                 selectedSetting.ConsumeRepeat();
+                lastActionWasJumpSlash = true;
                 randomMoveCount = 0;
                 currentActionSetting = null;
                 return;
             }
+
+            // ジャンプ切以外の攻撃 → 連続制限リセット.
+            lastActionWasJumpSlash = false;
 
             if (selectedSetting.actionState is EnemState_Wendig_Rush rush)
             {
@@ -286,6 +312,9 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
                 float newDistance = ownerTransform != null ? Vector3.Distance(ownerTransform.position, TargetPosition) : float.MaxValue;
                 if (newDistance <= moveActionSetting.activationDistance)
                 {
+                    // 移動後攻撃 → ジャンプ切連続制限リセット.
+                    lastActionWasJumpSlash = false;
+
                     if (moveActionSetting.actionState is EnemState_Wendig_Rush rush)
                     {
                         rush.SetStageEdge(ownerModel.StageMin.x, ownerModel.StageMax.x);
@@ -348,6 +377,7 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
             if (wendigModelAnger.Presenter is { } presenterNEnd)
                 presenterNEnd.IsAngerAction = false;
         }
+        lastActionWasJumpSlash = false;
         currentState = UpdaterState.Idle;
     }
 
@@ -593,6 +623,7 @@ public class EnemAIUpdater_Wendig_Normal : EnemAIUpdater_Wendig_abstract
             default: await WendigMasterAI.MeleeAttackState.Act(ownerModel); break;
         }
         meleeAttacksSinceLastRush++;
+        lastActionWasJumpSlash = false;
         randomMoveCount = 0;
         return true;
     }

@@ -2,7 +2,9 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using Cysharp.Threading.Tasks;
+using InGame;
 using InGame.Player;
+using InGame.Common;
 
 /// <summary>
 /// Wendigo バーサーク専用行動: メテオドロップ.
@@ -18,7 +20,6 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
     // 急降下設定.
     private float teleportHeight = 15f;
     private float fallInitialSpeed = 48.5f;
-    private float groundCheckDistance = 0.5f;
 
     // ジャンプ設定.
     private float jumpUpSpeed = 25f;
@@ -26,9 +27,6 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
     // ループ設定.
     private int minLoopCount = 3;
     private int maxLoopCount = 4;
-
-    // 着地判定用レイヤーマスク.
-    private int groundLayerMask = -1;
 
     // ライフサイクル間共有データ.
     private Rigidbody2D rb;
@@ -67,13 +65,6 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
 
         if (rb == null || ownerTransform == null) { isAborted = true; return; }
 
-        // レイヤーマスク初期化（JumpSlash同様: Platform | Default）.
-        if (groundLayerMask == -1)
-        {
-            int platformLayer = LayerMask.NameToLayer("Platform");
-            groundLayerMask = (1 << platformLayer) | (1 << LayerMask.NameToLayer("Default"));
-        }
-
         // 元の状態を保存.
         originalConstraints = rb.constraints;
         originalIsTrigger = mainColl != null ? mainColl.isTrigger : false;
@@ -110,11 +101,20 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
     {
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
 
-        // MeteorDrop中フラグON.
-        if (enemyModel.Presenter != null) enemyModel.Presenter.IsMeteorDropActive = true;
+        // MeteorDrop中フラグON + InGamePresenter 通知.
+        if (enemyModel.Presenter != null)
+        {
+            enemyModel.Presenter.IsMeteorDropActive = true;
+            enemyModel.Presenter.SetBattleState(EnemyBattleState.BigAttackActive);
+        }
 
         // 大技専用SE再生.
         enemyModel.Presenter?.PlaySE("MeteorDrop");
+
+        // BlueAuraエフェクトをloop再生（プレイヤーに追従）.
+        var blueAuraPlayer = Object.FindFirstObjectByType<PlayerScope>();
+        Transform blueAuraTarget = blueAuraPlayer != null ? blueAuraPlayer.transform : ownerTransform;
+        PlayerEffectPool.Instance(false)?.Spawn("BlueAura", blueAuraTarget.position, blueAuraTarget, loop: true);
 
         // === Phase1: 退避Rush ===
         Debug.Log("[MeteorDrop] Phase1: 退避Rush開始");
@@ -146,7 +146,6 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
             await ExecuteFall(enemyModel);
             if (isAborted) break;
 
-            // 3c. 着地後ハウリング.
             if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; break; }
 
             // Y軸制約を復元してからHowling.
@@ -163,7 +162,8 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
                     Object.Destroy(sw, 2f);
                 }
 
-                // 着地攻撃通告（パリィ不可）.
+                // 着地攻撃通告（パリィ不可 / 大技タグ）.
+                enemyModel.Presenter.SetAttackTag(EnemyAttackTag.BigAttack);
                 enemyModel.Presenter.PlayAttackWarning(false);
 
                 // 着地攻撃ダメージ計算.
@@ -172,8 +172,21 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
                     ? (int)(ownerWendigModel.GetCurrentAttackPower() * attackMultiplier)
                     : 90;
 
+                // 着地地点の近隣プラットフォームを破壊.
+                float platformBreakRadius = 5f;
+                var allPlatforms = Object.FindObjectsByType<PlatformBreakable>(FindObjectsSortMode.None);
+                foreach (var platform in allPlatforms)
+                {
+                    if (platform == null) continue;
+                    float dist = Vector2.Distance((Vector2)ownerTransform.position, (Vector2)platform.transform.position);
+                    if (dist <= platformBreakRadius)
+                    {
+                        platform.TriggerBreak(ownerTransform.position.x);
+                    }
+                }
+
                 // 距離ベースダメージ判定（コライダー内側問題を回避）.
-                float damageRadius = 3f;
+                float damageRadius = 4f;
                 Vector2 damageCenter = (Vector2)ownerTransform.position + new Vector2(0f, 1f);
                 var landingPlayerScope = Object.FindFirstObjectByType<PlayerScope>();
                 if (landingPlayerScope != null)
@@ -229,11 +242,18 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
             ownerTransform.rotation = Quaternion.Euler(0f, ownerTransform.rotation.eulerAngles.y, 0f);
         }
 
+        // BlueAuraエフェクトを停止.
+        PlayerEffectPool.Instance(false)?.StopAll("BlueAura");
+
         // 元の状態を復元（常に実行 — クリーンアップ保証）.
         RestoreState();
 
-        // MeteorDrop中フラグOFF.
-        if (enemyModel?.Presenter != null) enemyModel.Presenter.IsMeteorDropActive = false;
+        // MeteorDrop中フラグOFF + InGamePresenter 通知.
+        if (enemyModel?.Presenter != null)
+        {
+            enemyModel.Presenter.IsMeteorDropActive = false;
+            enemyModel.Presenter.SetBattleState(EnemyBattleState.Idle);
+        }
 
         if (EnemNullSafetyHelper.IsValid(enemyModel))
         {
@@ -350,59 +370,15 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
         float zTilt = yRot < 90f ? -85f : 85f;
         ownerTransform.rotation = Quaternion.Euler(0f, yRot, zTilt);
 
-        // 地面検知ループ（毎フレームレイキャスト — 時間ベース待機は使わない）.
-        bool landed = false;
-        float timeout = 5f;
-        float elapsed = 0f;
+        // 着地待機（基底クラスの共通メソッド使用: Default レイヤーのみ、中心からレイキャスト）.
+        bool landed = await WaitForLandingAsync(enemyModel, ownerTransform, rb);
 
-        while (!landed && elapsed < timeout)
-        {
-            if (isAborted) { rb.linearVelocity = Vector2.zero; return; }
-            if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
-
-            // 回転中はcol.boundsが不正確なため、transform.positionベースで検出.
-            // 上方オフセット付きレイキャストで地面に食い込んでいても検出可能.
-            float upOffset = 1.0f;
-            Vector2 rayOrigin = (Vector2)ownerTransform.position + Vector2.up * upOffset;
-
-            // 落下速度に応じてレイキャスト距離を拡大（高速落下時の地面貫通防止）.
-            float fallSpeed = Mathf.Abs(rb.linearVelocity.y);
-            float dynamicCheckDist = Mathf.Max(groundCheckDistance + upOffset, fallSpeed * Time.deltaTime * 3f + upOffset);
-
-            RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.down, dynamicCheckDist, groundLayerMask);
-            if (hit.collider != null)
-            {
-                landed = true;
-                rb.linearVelocity = Vector2.zero;
-
-                // 傾きを復元.
-                ownerTransform.rotation = Quaternion.Euler(0f, ownerTransform.rotation.eulerAngles.y, 0f);
-
-                // 着地位置補正（回転解除後の正しい足元位置で計算）.
-                Vector2 correctedFeetPos = GetFeetPosition(enemyModel);
-                float feetOffset = correctedFeetPos.y - ownerTransform.position.y;
-                ownerTransform.position = new Vector3(
-                    ownerTransform.position.x,
-                    hit.point.y - feetOffset,
-                    ownerTransform.position.z);
-            }
-
-            await UniTask.Yield();
-            elapsed += Time.deltaTime;
-        }
-
-        // タイムアウト時は強制着地.
-        if (!landed)
-        {
-            Debug.LogWarning("[MeteorDrop] 着地タイムアウト - 強制着地");
-            rb.linearVelocity = Vector2.zero;
-            // 傾きを復元.
+        // 傾きを復元.
+        if (ownerTransform != null)
             ownerTransform.rotation = Quaternion.Euler(0f, ownerTransform.rotation.eulerAngles.y, 0f);
-            ownerTransform.position = new Vector3(
-                ownerTransform.position.x,
-                enemyModel.StageMin.y,
-                ownerTransform.position.z);
-        }
+
+        if (!landed)
+            Debug.LogWarning("[MeteorDrop] 着地タイムアウト");
 
         // 着地アニメーション.
         if (EnemNullSafetyHelper.IsValidWithAnimator(enemyModel))
@@ -412,7 +388,7 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
 
         enemyModel.IsJumping = false;
 
-        Debug.Log($"[MeteorDrop] 着地完了 - pos: {ownerTransform.position}, landed: {landed}");
+        Debug.Log($"[MeteorDrop] 着地完了 - pos: {ownerTransform?.position}, landed: {landed}");
     }
 
     // === Phase3e: ジャンプで画面外上部に戻る ===
@@ -474,16 +450,6 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
             elapsed += Time.unscaledDeltaTime;
         }
         return true;
-    }
-
-    private Vector2 GetFeetPosition(EnemyModel_abstract enemyModel)
-    {
-        Collider2D col = enemyModel.GetComponent<Collider2D>();
-        if (col != null)
-        {
-            return new Vector2(col.bounds.center.x, col.bounds.min.y);
-        }
-        return (Vector2)ownerTransform.position;
     }
 
     private void RestoreState()

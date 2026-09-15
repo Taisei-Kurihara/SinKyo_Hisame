@@ -142,6 +142,119 @@ namespace InGame.Common
 
         // ---- 死亡通知 ----
 
+        /// <summary>
+        /// 必殺技確定勝利時に通常の NotifyEnemyDeath を抑制する.
+        /// IsVictory = true にすることで MonitorEnemyHP からの呼び出しをブロックする.
+        /// 特殊勝利演出は ExecuteChanceAttackAsync 完了後に NotifyEnemyDeathSpecial() で行う.
+        /// </summary>
+        public void SuppressNormalVictory()
+        {
+            IsVictory = true;
+        }
+
+        /// <summary>
+        /// 必殺技確定勝利の特殊演出.
+        /// 白黒演出を省略し、0.5sec待機後にズーム → Win表示.
+        /// </summary>
+        public async UniTask NotifyEnemyDeathSpecial()
+        {
+            if (IsDefeat) return;
+            // IsVictory は SuppressNormalVictory() で既に true.
+
+            Debug.Log("[DeathManager] 特殊勝利演出開始 (必殺技確定)");
+
+            StopAllEnemyAI();
+
+            // プレイヤー操作を無効化.
+            var playerScope = UnityEngine.Object.FindFirstObjectByType<PlayerScope>();
+            if (playerScope != null) playerScope.SetPlayerEnable(false);
+
+            var playerView = UnityEngine.Object.FindFirstObjectByType<PlayerView>();
+            var cam = CameraManager.Instance();
+
+            var mainCam = Camera.main;
+            float originalZoom = mainCam != null
+                ? (mainCam.orthographic ? mainCam.orthographicSize : mainCam.fieldOfView)
+                : 60f;
+
+            // チュートリアルCanvas非表示.
+            var tutorialView = UnityEngine.Object.FindFirstObjectByType<TutorialWindow>();
+            if (tutorialView != null) tutorialView.gameObject.SetActive(false);
+
+            // UI非表示.
+            if (playerView != null) playerView.SetStatusUIAlpha(0f);
+            var enemyUISetters = UnityEngine.Object.FindObjectsByType<EnemyUI_View_Setter>(FindObjectsSortMode.None);
+            foreach (var setter in enemyUISetters)
+                if (setter != null) setter.gameObject.SetActive(false);
+            var offScreenIndicators = UnityEngine.Object.FindObjectsByType<EnemyOffScreenIndicator>(FindObjectsSortMode.None);
+            foreach (var indicator in offScreenIndicators)
+                if (indicator != null) indicator.gameObject.SetActive(false);
+
+            // 残留エフェクト状態をクリア.
+            Time.timeScale = 1f;
+            FullscreenBlackEffectFeature.Blend = 0f;
+            FullscreenBlackEffectFeature.IsEnabled = false;
+            cam.UseUnscaledTime = false;
+
+            // ズームロック（ApplyHeartRateZoom 上書き防止）.
+            cam.SetZoomLock(true);
+
+            // === 0.5sec待機（白黒演出なし） ===
+            float waitStart = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - waitStart < 0.5f)
+                await UniTask.Yield();
+
+            // === Step5: ズーム（プレイヤー中心） ===
+            cam.ClearBounds();
+            cam.SetFollowSpeed(30f);
+            float zoomTarget = originalZoom * 0.5f;
+            await cam.ZoomTo(zoomTarget, 2.0f);
+            cam.SetZoomLock(true);
+
+            // 納刀アニメーション2.
+            var playerAnim = UnityEngine.Object.FindFirstObjectByType<PlayerAnimationController>();
+            if (playerAnim != null) playerAnim.PlayTrigger("sheathing_of_sword_2");
+
+            // === Step6: Win.alpha → 1 (0.5s realtime) ===
+            skipInputCount = 0;
+            float startTime = Time.realtimeSinceStartup;
+            float duration = 0.5f;
+            while (Time.realtimeSinceStartup - startTime < duration)
+            {
+                float t = Mathf.Clamp01((Time.realtimeSinceStartup - startTime) / duration);
+                if (playerView != null) playerView.SetWinAlpha(t);
+                if (CheckAnyInputDown()) skipInputCount++;
+                if (skipInputCount >= 3) { TransitionToTitle(); return; }
+                await UniTask.Yield();
+            }
+            if (playerView != null) playerView.SetWinAlpha(1f);
+
+            // === Step6.5: Win表示後 1.5sec待機 ===
+            startTime = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - startTime < 1.5f)
+            {
+                if (CheckAnyInputDown()) skipInputCount++;
+                if (skipInputCount >= 3) { TransitionToTitle(); return; }
+                await UniTask.Yield();
+            }
+
+            // GameOverView表示.
+            var gameOverView = UnityEngine.Object.FindFirstObjectByType<GameOverView>();
+            if (gameOverView != null) gameOverView.Show(true);
+
+            // 3sec待機（入力スキップ可能）.
+            startTime = Time.realtimeSinceStartup;
+            duration = 3f;
+            while (Time.realtimeSinceStartup - startTime < duration)
+            {
+                if (CheckAnyInputDown()) skipInputCount++;
+                if (skipInputCount >= 3) break;
+                await UniTask.Yield();
+            }
+
+            TransitionToTitle();
+        }
+
         // Enemy死亡時に呼ばれる（勝利演出シーケンス）.
         // 流れ: timeScale=0 → 白黒化 → timeScale徐々に1 + 白黒率徐々に0
         //       → 白黒解除 → 待機 → ズーム → win文字出現.
@@ -173,7 +286,7 @@ namespace InGame.Common
                 : 60f;
 
             // チュートリアルCanvas非表示.
-            var tutorialView = UnityEngine.Object.FindFirstObjectByType<TutorialView>();
+            var tutorialView = UnityEngine.Object.FindFirstObjectByType<TutorialWindow>();
             if (tutorialView != null) tutorialView.gameObject.SetActive(false);
 
             // UI非表示.
@@ -415,15 +528,6 @@ namespace InGame.Common
             FullscreenBlackEffectFeature.FillEnabled = true;
             var cam = CameraManager.Instance();
             if (cam != null) cam.UseUnscaledTime = false;
-
-            // プレイヤーUI状態を復元（DontDestroyOnLoadで永続する場合対策）.
-            var playerView = UnityEngine.Object.FindFirstObjectByType<PlayerView>();
-            if (playerView != null)
-            {
-                playerView.SetStatusUIAlpha(1f);
-                playerView.SetWinAlpha(0f);
-                playerView.SetLoseAlpha(0f);
-            }
 
             Debug.Log("[DeathManager] シーン遷移開始");
 

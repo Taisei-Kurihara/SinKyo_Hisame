@@ -22,9 +22,14 @@ public abstract class EnemInterruptState_Dead_abstract : EnemInterruptState_abst
             return;
         }
 
+        // 競合する可能性のあるトリガーをリセット.
+        var animator = enemyModel.Animator;
+        animator.ResetTrigger("Attack");
+        animator.ResetTrigger("Stun");
+        animator.ResetTrigger("Hurt");
+
         // Deadアニメーショントリガー実行（リトライ付き）.
-        enemyModel.Animator.SetTrigger("Dead");
-        Debug.Log($"[EnemInterruptState_Dead_abstract] Dead トリガー実行");
+        animator.SetTrigger("Dead");
 
         // 数フレームにわたって死亡アニメーション再生を確認し、未再生なら再発火.
         int maxRetry = 10;
@@ -37,14 +42,15 @@ public abstract class EnemInterruptState_Dead_abstract : EnemInterruptState_abst
             if (info.IsName("Dead"))
             {
                 confirmed = true;
-                Debug.Log($"[EnemInterruptState_Dead_abstract] Dead アニメーション確認済 (frame {i})");
                 break;
             }
-            enemyModel.Animator.SetTrigger("Dead");
+            animator.SetTrigger("Dead");
         }
-        if (!confirmed)
+
+        // リトライでも遷移しなかった場合、Deadステートを強制再生.
+        if (!confirmed && enemyModel != null && enemyModel.Animator != null)
         {
-            Debug.LogWarning($"[EnemInterruptState_Dead_abstract] Dead アニメーション未確認 - 強制続行");
+            animator.Play("Dead", 0, 0f);
         }
 
         // 2秒待機.

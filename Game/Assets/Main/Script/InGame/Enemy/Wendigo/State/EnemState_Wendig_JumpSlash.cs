@@ -17,8 +17,6 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
     private float jumpHeight = 2.5f;            // ジャンプの高さ（放物線軌道用に低め）.
     private float landingOffsetX = 0.5f;        // プレイヤー横のオフセット（近くに着地）.
     private float airMeleeRange = 2.5f;         // 空中近接攻撃の射程.
-    private float groundCheckDistance = 0.3f;    // 着地判定レイキャスト距離.
-
     // 後退設定（X軸が近い場合）.
     private float retreatThresholdX = 3f;       // 後退を行うX距離の閾値.
     private float retreatDistance = 3f;          // 後退距離.
@@ -42,9 +40,6 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
 
     // ターゲット位置（AI側から設定）.
     private Vector3 targetPosition;
-
-    // 着地判定用レイヤーマスク.
-    private int groundLayerMask = -1;
 
     public EnemState_Wendig_JumpSlash()
     {
@@ -80,13 +75,6 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
         float animSpeed = enemyModel.AnimSpeed;
 
         if (rb == null || ownerTransform == null) { isAborted = true; return; }
-
-        // レイヤーマスク初期化（Ground + Platform）.
-        if (groundLayerMask == -1)
-        {
-            int platformLayer = LayerMask.NameToLayer("Platform");
-            groundLayerMask = (1 << platformLayer) | (1 << LayerMask.NameToLayer("Default"));
-        }
 
         // 元の状態を保存.
         originalConstraints = rb.constraints;
@@ -266,7 +254,7 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             // 着地判定.
             if (rb.linearVelocity.y <= 0.1f && airTimeElapsed > 0.2f)
             {
-                hasLanded = CheckGrounded(enemyModel);
+                hasLanded = IsOnGround(ownerTransform);
             }
 
             await UniTask.Yield();
@@ -290,9 +278,6 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             animator.SetBool("OnGround", true);
             animator.SetInteger("Move", 0);
         }
-
-        // 着地位置をスナップ（isTrigger中は物理衝突しないため手動で地面に合わせる）.
-        SnapToGround(enemyModel);
 
         // ジャンプ終了: FixedUpdateのPlatform制御を復帰.
         enemyModel.IsJumping = false;
@@ -341,54 +326,6 @@ public class EnemState_Wendig_JumpSlash : EnemState_abstract
             animator.SetInteger("Move", 0);
         }
         await UniTask.CompletedTask;
-    }
-
-    // 着地判定: Collider下端より少し上からレイキャストで地面を検出.
-    private bool CheckGrounded(EnemyModel_abstract enemyModel)
-    {
-        if (rb == null || ownerTransform == null) return false;
-
-        Vector2 feetPos = GetFeetPosition(enemyModel);
-
-        // 足元が地面と重なっている場合に検出できるよう、上方向にオフセット.
-        float upOffset = 0.3f;
-        Vector2 rayOrigin = feetPos + Vector2.up * upOffset;
-
-        // 落下速度に応じてレイキャスト距離を拡大（高速落下時の検出漏れ防止）.
-        float fallSpeed = Mathf.Abs(rb.linearVelocity.y);
-        float dynamicDist = Mathf.Max(groundCheckDistance + upOffset, fallSpeed * Time.deltaTime * 2f + upOffset);
-
-        // Platform/Defaultレイヤーに対して下方向レイキャスト.
-        RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.down, dynamicDist, groundLayerMask);
-        return hit.collider != null;
-    }
-
-    // 着地時に地面表面へ位置をスナップ（isTrigger中は物理衝突しないため手動補正）.
-    private void SnapToGround(EnemyModel_abstract enemyModel)
-    {
-        if (rb == null || ownerTransform == null) return;
-
-        Vector2 feetPos = GetFeetPosition(enemyModel);
-
-        // やや長めのレイキャストで地面を検出.
-        RaycastHit2D hit = Physics2D.Raycast(feetPos + Vector2.up * 0.5f, Vector2.down, 1.5f, groundLayerMask);
-        if (hit.collider != null)
-        {
-            // 足元を地面表面に合わせる.
-            float feetOffset = feetPos.y - ownerTransform.position.y;
-            ownerTransform.position = new Vector3(ownerTransform.position.x, hit.point.y - feetOffset, ownerTransform.position.z);
-        }
-    }
-
-    // 足元位置を取得.
-    private Vector2 GetFeetPosition(EnemyModel_abstract enemyModel)
-    {
-        Collider2D col = enemyModel.GetComponent<Collider2D>();
-        if (col != null)
-        {
-            return new Vector2(col.bounds.center.x, col.bounds.min.y);
-        }
-        return (Vector2)ownerTransform.position;
     }
 
     // 元の状態を復元するヘルパーメソッド.

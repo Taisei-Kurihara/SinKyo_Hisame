@@ -304,13 +304,13 @@ namespace InGame.Player
             onHitCallback?.Invoke();
 
             // 心拍数上昇時の追加多段ヒット（居合以外）.
+            // 追加1: ×0.25, 追加2: ×0.5, 追加3: ×0.75, 追加4: ×1.0（累積）.
             if (attackType != PlayerAttackType.Iai)
             {
                 int extraHits = CalculateExtraHits();
                 if (extraHits > 0)
                 {
-                    float extraDamage = damage * 0.275f;
-                    ExecuteExtraHitsAsync(target, hitCollider, hitPos, facingRight, extraHits, extraDamage).Forget();
+                    ExecuteExtraHitsAsync(target, hitCollider, hitPos, facingRight, extraHits, damage).Forget();
                 }
             }
         }
@@ -329,16 +329,24 @@ namespace InGame.Player
             return Mathf.Clamp(hits, 0, 4);
         }
 
+        // 追加攻撃の段階別倍率: 追加1=0.25, 追加2=0.5, 追加3=0.75, 追加4=1.0.
+        private static readonly float[] extraHitMultipliers = { 0.25f, 0.5f, 0.75f, 1.0f };
+
         /// <summary>
         /// 追加ヒットを0.1秒間隔で実行（hitstop/effect/SE付き）.
+        /// 各追加ヒットは攻撃力×段階別倍率でダメージを与える.
         /// </summary>
-        private async UniTaskVoid ExecuteExtraHitsAsync(GameObject target, Collider2D hitCollider, Vector3 hitPos, bool facingRight, int count, float extraDamage)
+        private async UniTaskVoid ExecuteExtraHitsAsync(GameObject target, Collider2D hitCollider, Vector3 hitPos, bool facingRight, int count, float baseDamage)
         {
             for (int i = 0; i < count; i++)
             {
                 await UniTask.Delay(TimeSpan.FromSeconds(0.1f), ignoreTimeScale: true);
 
                 if (target == null) break;
+
+                // 段階別倍率で追加ダメージ算出.
+                float multiplier = i < extraHitMultipliers.Length ? extraHitMultipliers[i] : 1.0f;
+                float extraDamage = baseDamage * multiplier;
 
                 // 追加ダメージ.
                 DamageEnemy(target, extraDamage);

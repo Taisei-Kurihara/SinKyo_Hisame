@@ -40,6 +40,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 4790206eadc817b4196e071640e653af
+    m_Address: HitEffect
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 4dbac9dfee5c7094583c1b72f770d175
     m_Address: SE_PlayerHurt
     m_ReadOnly: 0
@@ -57,6 +62,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 63ab686381f7e5c4faa70f9cdc093d4d
     m_Address: EnemyView
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 6501e14da1727bf478ee34a1620a2641
+    m_Address: ChanceAttackSlash
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -85,6 +95,16 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a253451033c77a047b420a24efd62cc6
+    m_Address: Down
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ad38bd45a19df7c40985d723964eb45b
+    m_Address: BlueAura
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: ad61251d5e48db24194c97171f4d00f5
     m_Address: SE_Stan
     m_ReadOnly: 0
@@ -100,13 +120,33 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: b6d3e2e4b8df2964eb3dfce561902f3e
+    m_Address: PlayerEffect_Stun
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: b9d5451d0b0415a4bab7c7a1cf4febca
     m_Address: PlayerView
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bf7fb13564ad23c448ba5a6f67f54846
+    m_Address: UP
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c2891704bd6413946ab8af725fb72212
+    m_Address: PlayerEffect_Heal
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c69caffcae62ceb40bdf6578ddcdab3d
     m_Address: BloodSplatter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: dc1c1d02dda21a74590c89b2cf92ac27
+    m_Address: CommonFadeCanvas
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -117,6 +157,11 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: de03584afdde2154d8535edc9c176504
     m_Address: SE_IaiAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e1818fcc5079a9440b4f83a4196a8b88
+    m_Address: SE_Button
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

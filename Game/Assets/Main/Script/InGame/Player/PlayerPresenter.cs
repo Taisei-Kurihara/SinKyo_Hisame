@@ -10,6 +10,8 @@ using InGame.Player;
 using InGame.Player.Animation;
 using InGame.Common;
 using Tutorial;
+using LitMotion;
+using LitMotion.Extensions;
 
 namespace InGame.Player
 {
@@ -93,6 +95,17 @@ namespace InGame.Player
         /// <summary>居合発動検知フラグ（チュートリアル監視用）.</summary>
         public static bool IsIaiPerformed { get; set; } = false;
         private bool isPulseMaxStunning = false;
+
+        // チャンス状態（Enemy大技スタン時、必殺技発動可能）.
+        private bool isChanceState = false;
+        private float chanceStateEndTime = 0f;
+        private const float chanceStateDuration = 8f; // MeteorDropStan(5sec)+着地時間バッファ.
+        // 必殺技確定勝利フラグ: 必殺技ダメージ >= 敵HP のとき true.
+        // 通常勝利演出を抑制し、必殺技完了後に特殊勝利演出を発動する.
+        private bool isLethalChanceAttack = false;
+
+        // 居合hosi アニメーションループ制御.
+        private System.Threading.CancellationTokenSource hosiLoopCts;
         private bool stunInterruptedByDamage = false;
 
         // SE用.
@@ -134,6 +147,10 @@ namespace InGame.Player
 
             // Player死亡条件をSceneChangeStandに登録.
             RegisterPlayerDeathCondition();
+
+            // InGamePresenter に Enemy 長時間スタン通知コールバックを登録.
+            // EnemyBattleState.StunLong に遷移した瞬間に確実に isChanceState が立つ.
+            InGamePresenter.Instance.RegisterOnEnemyState(EnemyBattleState.StunLong, OnEnemyStunLong);
 
             //Playerのキーコンフィグ
             compositeDisposePlayer.Add(
@@ -206,6 +223,13 @@ namespace InGame.Player
                     // previousPulseValue はエフェクト発火 or 方向確定時のみ更新.
                     // 緩やかな変化でも累積で閾値を超えれば検出される.
                     float currentPulse = pulseModel.GetPulseGauge();
+
+                    // 心拍数状態を InGamePresenter へ通知（状態変化時のみ発火）.
+                    var hrState = currentPulse >= 100f ? PlayerHeartRateState.Critical
+                                : currentPulse >= 70f  ? PlayerHeartRateState.Elevated
+                                : PlayerHeartRateState.Normal;
+                    InGamePresenter.Instance.SetHeartRateState(hrState);
+
                     float accumulatedDelta = currentPulse - previousPulseValue;
                     pulseEffectCooldown -= UnityEngine.Time.fixedDeltaTime;
 
@@ -219,8 +243,13 @@ namespace InGame.Player
                             var pulseAvator = playerModel.GetAvator();
                             if (pulseAvator != null)
                             {
-                                string effectName = newDirection > 0 ? "UP" : "Down";
-                                PlayerEffectPool.Instance(false).Spawn(effectName, pulseAvator.transform.position, pulseAvator.transform);
+                                string effectName     = newDirection > 0 ? "UP"   : "Down";
+                                string oppositeEffect = newDirection > 0 ? "Down" : "UP";
+                                Vector3 effectPos = pulseAvator.transform.position;
+                                if (newDirection < 0) effectPos.y += 1.5f;
+                                // 逆方向エフェクトをプールに返却し、常に片方のみ表示.
+                                PlayerEffectPool.Instance(false)?.StopAll(oppositeEffect);
+                                PlayerEffectPool.Instance(false)?.Spawn(effectName, effectPos, pulseAvator.transform);
                             }
                             pulseEffectCooldown = pulseEffectSameDirectionInterval;
                         }
@@ -324,6 +353,9 @@ namespace InGame.Player
             // ポーズボタン: 短押し=tutorial表示 / 長押し=タイトルに戻る.
             UpdatePoseButton();
 
+            // デバッグキー（エディタ専用）.
+            UpdateDebugKeys();
+
             // チュートリアル等でアクション無効化中は移動・攻撃等をスキップ.
             if (!playerActionEnable) return;
 
@@ -384,11 +416,28 @@ namespace InGame.Player
                     iaiConditionsMet = iaiReadyRatio >= 1f;
                 }
 
+                // チャンス状態タイムアウトリセット.
+                if (isChanceState && UnityEngine.Time.time > chanceStateEndTime)
+                {
+                    isChanceState = false;
+                    Debug.Log("[PlayerPresenter] チャンス状態タイムアウト");
+                }
+
+                // チャンス状態: 居合条件より優先して必殺技発動.
+                if (isChanceState && inputActions.CharacterController.FirstAttack.WasPressedThisFrame())
+                {
+                    isChanceState = false;
+                    isIaiActive = true; // 同フレームでの居合二重発動を防止.
+                    EndJakComboIfActive();
+                    ExecuteChanceAttackAsync().Forget();
+                }
                 // 攻撃入力（居合条件未達成時のみ）.
-                if (!iaiConditionsMet)
+                else if (!iaiConditionsMet)
                 {
                 if (inputActions.CharacterController.FirstAttack.WasPressedThisFrame())
-                { ExecuteJakComboAttackAsync().Forget(); }
+                {
+                    ExecuteJakComboAttackAsync().Forget();
+                }
                 else if (inputActions.CharacterController.SecondAttack.WasPressedThisFrame())
                 { EndJakComboIfActive(); ExecuteMeleeAttackAsync("FirstAttack").Forget(); }
                 else if (inputActions.CharacterController.SpecialAttack.WasPressedThisFrame())
@@ -485,7 +534,10 @@ namespace InGame.Player
                 {
                     iaiReadyNotified = true;
                     playerAnimation?.PlayTrigger("sheathing_of_sword_2");
-                    Debug.Log("[PlayerPresenter] HeartResist Start - ゲージ残存: sheathing_of_sword_2 trigger");
+                    // 居合発動可能状態で再度抑えた: hosi を即時再生してループ再起動.
+                    playerAnimation?.PlayTrigger("hosi");
+                    StartHosiLoop();
+                    Debug.Log("[PlayerPresenter] HeartResist Start - ゲージ残存: sheathing_of_sword_2 + hosi trigger");
                 }
                 else
                 {
@@ -549,7 +601,10 @@ namespace InGame.Player
                     playerAnimation?.PlayTrigger("sheathing_of_sword_2");
                     playerAnimation?.SetIaiWarning(true);
                     guardSEPlayer?.Play("SE_IaiReady");
-                    Debug.Log("[PlayerPresenter] Iai ready - sheathing_of_sword_2 trigger + warning start");
+                    // 居合発動可能: hosi アニメーション再生 + 2secループ開始.
+                    playerAnimation?.PlayTrigger("hosi");
+                    StartHosiLoop();
+                    Debug.Log("[PlayerPresenter] Iai ready - sheathing_of_sword_2 + hosi trigger + loop start");
                 }
             }
 
@@ -565,6 +620,7 @@ namespace InGame.Player
                 heartResistCooldownEnd = UnityEngine.Time.time + heartResistCooldown;
                 playerAnimation?.SetSuppressMovement(false);
                 playerAnimation?.SetIaiWarning(false);
+                CancelHosiLoop();
                 ExecuteIaiAttackAsync().Forget();
                 Debug.Log($"[PlayerPresenter] Iai発動 (ratio={iaiReadyRatio:F2})");
             }
@@ -596,6 +652,7 @@ namespace InGame.Player
                     iaiReadyRatio = 0f;
                     iaiReadyNotified = false;
                     playerAnimation?.SetIaiWarning(false);
+                    CancelHosiLoop();
                 }
             }
 
@@ -637,8 +694,8 @@ namespace InGame.Player
             // 被ダメージSE.
             guardSEPlayer?.Play("SE_PlayerHurt");
 
-            // 鼓動上昇: 現在の鼓動値×0.3.
-            pulseModel.OnDamageTaken();
+            // 鼓動上昇: 被弾ダメージ×0.25.
+            pulseModel.OnDamageTaken(damage);
 
             // スタン中に被弾 → スタン解除.
             if (isPulseMaxStunning && damage > 0)
@@ -750,94 +807,58 @@ namespace InGame.Player
             gameOverView = _gameOverView;
         }
 
-        // ---- ポーズボタン: 短押し=tutorial / 長押し=タイトル戻り ----
+        // ---- デバッグキー（エディタ専用） ----
 
         /// <summary>
-        /// ポーズボタンの押下状態を監視し、短押し/長押しで動作を分岐.
+        /// エディタ専用デバッグキーの処理.
+        /// C キー: 長時間スタン（チャンス状態）を即時発動.
+        /// </summary>
+        private void UpdateDebugKeys()
+        {
+#if UNITY_EDITOR
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard == null) return;
+
+            // C キー: 長時間スタン + チャンス状態を即時発動.
+            if (keyboard.cKey.wasPressedThisFrame)
+            {
+                var enemy = UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>();
+                if (enemy != null && enemy.Model is EnemyModel_Wendig wendigDebug)
+                {
+                    wendigDebug.AbortMeteorDrop();
+                    wendigDebug.TriggerMeteorDropStan().Forget();
+                }
+                isChanceState = true;
+                chanceStateEndTime = UnityEngine.Time.time + chanceStateDuration;
+                Debug.Log("[DEBUG] Cキー: 長時間スタン + チャンス状態 発動");
+            }
+#endif
+        }
+
+        // ---- ポーズボタン: ESC押下でポーズメニュー表示 ----
+        // PauseMenuEventer 参照（ポーズメニュー制御）.
+        private InGame.Common.PauseMenuEventer pauseMenuEventer;
+
+        /// <summary>
+        /// ポーズボタン(ESC)の押下を監視し、ポーズメニューを表示する.
+        /// メニュー内の操作（再開/チュートリアル/設定/終了）は PauseMenuEventer が処理.
         /// </summary>
         private void UpdatePoseButton()
         {
-            var tutorialManager = TutorialManager.Instance(false);
-            TutorialView tutorialView = tutorialManager?.View;
+            // PauseMenuEventer の遅延取得.
+            if (pauseMenuEventer == null)
+            {
+                pauseMenuEventer = UnityEngine.Object.FindObjectOfType<InGame.Common.PauseMenuEventer>();
+                if (pauseMenuEventer != null) { /* 取得成功 */ }
+            }
 
-            // 押下開始.
+            // ESC押下 → ポーズメニュー表示.
             if (inputActions.Player.Pose.WasPressedThisFrame())
             {
-                isPoseHolding = true;
-                poseHoldTime = 0f;
-
-                // タイトル戻り進捗ウィンドウ表示.
-                if (tutorialView?.TitleReturnWindow != null)
-                    tutorialView.TitleReturnWindow.SetActive(true);
-                tutorialView?.SetTitleReturnProgress(0f);
-            }
-
-            // 押下中: 長押し進捗更新.
-            if (isPoseHolding && inputActions.Player.Pose.IsPressed())
-            {
-                poseHoldTime += Time.unscaledDeltaTime;
-                float progress = Mathf.Clamp01(poseHoldTime / titleReturnHoldDuration);
-
-                tutorialView?.SetTitleReturnProgress(progress);
-
-                // 長押し完了 → タイトルに戻る.
-                if (progress >= 1f)
+                if (pauseMenuEventer != null && !pauseMenuEventer.IsMenuVisible)
                 {
-                    isPoseHolding = false;
-                    isTutorialVisible = false;
-                    UnityEngine.Time.timeScale = 1f;
-                    if (tutorialView?.TitleReturnWindow != null)
-                        tutorialView.TitleReturnWindow.SetActive(false);
-
-                    SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
-                    return;
-                }
-            }
-
-            // 離した: 短押し判定.
-            if (inputActions.Player.Pose.WasReleasedThisFrame() && isPoseHolding)
-            {
-                isPoseHolding = false;
-
-                // タイトル戻りウィンドウ非表示.
-                if (tutorialView?.TitleReturnWindow != null)
-                    tutorialView.TitleReturnWindow.SetActive(false);
-
-                // 短押し → tutorial表示/非表示トグル.
-                if (poseHoldTime < shortPressThreshold && tutorialManager != null)
-                {
-                    if (tutorialManager.IsTutorialScene)
-                    {
-                        // チュートリアルシーン: 入力監視中(MonitoringInput)のみポーズ可能.
-                        if (tutorialManager.CurrentPhase == Tutorial.TutorialPhase.MonitoringInput)
-                        {
-                            isTutorialVisible = true;
-                            tutorialManager.PauseTutorialScene();
-                            ignoreMoveUntilRelease = true;
-                        }
-                        else if (tutorialManager.CurrentPhase == Tutorial.TutorialPhase.ShowingExplanation)
-                        {
-                            // ポーズ中: 復帰.
-                            isTutorialVisible = false;
-                            tutorialManager.ResumeTutorialScene();
-                        }
-                    }
-                    else
-                    {
-                        // ゲームシーン: 従来通りトグル.
-                        isTutorialVisible = !isTutorialVisible;
-                        if (isTutorialVisible)
-                        {
-                            tutorialManager.StartTutorial();
-                            UnityEngine.Time.timeScale = 0f;
-                            ignoreMoveUntilRelease = true;
-                        }
-                        else
-                        {
-                            tutorialManager.HideTutorial();
-                            UnityEngine.Time.timeScale = 1f;
-                        }
-                    }
+                    pauseMenuEventer.ShowMenu();
+                    ignoreMoveUntilRelease = true;
                 }
             }
         }
@@ -871,6 +892,39 @@ namespace InGame.Player
             }
 
             compositeDisposePlayer?.Dispose();
+
+            // InGamePresenter のコールバック登録を解除.
+            InGamePresenter.Instance.UnregisterOnEnemyState(EnemyBattleState.StunLong, OnEnemyStunLong);
+        }
+
+        // =====================================================================
+        // InGamePresenter コールバック
+        // =====================================================================
+
+        /// <summary>
+        /// EnemyBattleState.StunLong 遷移時に InGamePresenter から呼ばれる.
+        /// ポーリングによるフラグ監視を廃止し、通知ドリブンでチャンス状態を開始する.
+        /// </summary>
+        private void OnEnemyStunLong()
+        {
+            isChanceState = true;
+            chanceStateEndTime = UnityEngine.Time.time + chanceStateDuration;
+
+            // 必殺技確定勝利チェック: 9ヒット合計ダメージ >= 敵現在HP なら通常勝利演出を抑制.
+            var enemy = UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>();
+            if (enemy?.Status != null && enemy.Status.hp.Value > 0f)
+            {
+                float pulse = pulseModel.GetPulseGauge();
+                float totalDamage = pulse >= 100f ? 2500f : Mathf.Lerp(5000f, 2500f, pulse / 100f);
+                if (totalDamage >= enemy.Status.hp.Value)
+                {
+                    isLethalChanceAttack = true;
+                    InGame.Common.DeathManager.Instance.SuppressNormalVictory();
+                    Debug.Log($"[PlayerPresenter] 必殺技確定勝利: totalDmg({totalDamage:F0}) >= hp({enemy.Status.hp.Value:F0})");
+                }
+            }
+
+            Debug.Log("[PlayerPresenter] InGamePresenter(StunLong) → チャンス状態開始");
         }
 
         // 居合中フラグ.
@@ -969,6 +1023,16 @@ namespace InGame.Player
                 if (angle > iaiDodgeAngle) return result;
             }
 
+            // MeteorDrop中は常に発動（落下フェーズでは IsRushing/IsAttackImminent が立たないため特例）.
+            if (enemy.IsMeteorDropActive)
+            {
+                result.shouldTriggerIai = true;
+                result.enemy = enemy;
+                result.isParryable = false; // MeteorDrop は常にパリィ不可.
+                Debug.Log("[PlayerPresenter] 回避居合い条件成立(MeteorDrop)");
+                return result;
+            }
+
             // タイミングチェック.
             bool isRushing = enemy.IsRushing;
             bool isAttackImminent = enemy.IsAttackImminent
@@ -993,27 +1057,21 @@ namespace InGame.Player
             // 通常回避を実行（無敵+移動）.
             playerModel.OnDodge(dodgeDir);
 
-            // パリィ不可攻撃の場合: ダメージなし、居合アニメなし、スタンなし.
+            // パリィ不可攻撃の場合.
             if (!isParryable)
             {
-                Debug.Log("[PlayerPresenter] 回避居合い → パリィ不可攻撃: ダメージ/スタンなし");
-
-                // 吸収ゲージ上昇（パリィ不可攻撃でも回避成功時は増加）.
+                // 吸収ゲージ上昇.
                 {
                     var drainModel = PlayerManager.Instance().drainModel;
-                    int drainAmount = 5;
-                    drainModel?.Increment(drainAmount);
+                    drainModel?.Increment(5);
                 }
 
                 // パリィSE再生.
                 guardSEPlayer?.Play("SE_Parry");
 
-                // MeteorDrop中のパリィ: 0.5secスタン.
-                if (enemy != null && enemy.IsMeteorDropActive && enemy.Model is EnemyModel_Wendig wendigModelParry)
-                {
-                    wendigModelParry.TriggerIaiStan().Forget();
-                    Debug.Log("[PlayerPresenter] パリィ → MeteorDrop中: 0.5secスタン");
-                }
+                // パリィ不可攻撃（大技含む）: 当たり判定無効化 + 無敵延長のみ.
+                // ※ 大技への長時間スタン/チャンス状態は居合いでのみ発動する.
+                Debug.Log("[PlayerPresenter] 回避 → パリィ不可攻撃: ダメージ/スタンなし");
 
                 // 敵の当たり判定無効化 + 無敵延長.
                 if (enemy != null && enemy.Model != null)
@@ -1026,106 +1084,411 @@ namespace InGame.Player
                 return;
             }
 
-            // === パリィ可能攻撃: 居合い攻撃を発動 ===
-            ForceGuardEnd();
-            playerModel.OnMove(Vector2.zero);
-            isIaiActive = true;
-            IsIaiPerformed = true;
-
-            // 回避パリィでは心拍数25刻み変化を行わない（居合パリィのみ）.
-            // pulseModel.OnIaiActivated();
+            // === パリィ可能攻撃: パリィ処理（Iai ではなくパリィスタン）===
+            Debug.Log("[PlayerPresenter] 回避 → パリィ成功: ParryStan発動");
 
             // 吸収ゲージ上昇.
             {
                 var drainModel = PlayerManager.Instance().drainModel;
-                int drainAmount = 5;
-                drainModel?.Increment(drainAmount);
+                drainModel?.Increment(5);
             }
 
+            // パリィSE.
+            guardSEPlayer?.Play("SE_Parry");
+
+            // パリィスタン（1sec）発動.
+            if (enemy != null && enemy.Model is EnemyModel_Wendig wendigModelNormal)
+            {
+                wendigModelNormal.TriggerParryStan().Forget();
+            }
+
+            // 敵の当たり判定無効化 + 無敵延長.
+            if (enemy != null && enemy.Model != null)
+            {
+                enemy.Model.SkipHitDetection = true;
+                ClearSkipHitDetectionDelayed(enemy.Model).Forget();
+            }
+            ExtendDodgeInvincibility().Forget();
+
+        }
+
+        /// <summary>
+        /// パリィ後0.5sec経過したら強制的にIdle状態に遷移.
+        /// 移動していなくても確実にアイドルに戻す.
+        /// </summary>
+        /// <summary>
+        /// hosi アニメーションを 2sec ごとにループ再生.
+        /// 居合発動可能状態(iaiReadyRatio >= 1f)の間だけ再生する.
+        /// </summary>
+        private void StartHosiLoop()
+        {
+            hosiLoopCts?.Cancel();
+            hosiLoopCts?.Dispose();
+            hosiLoopCts = new System.Threading.CancellationTokenSource();
+            HosiLoopAsync(hosiLoopCts.Token).Forget();
+        }
+
+        private void CancelHosiLoop()
+        {
+            hosiLoopCts?.Cancel();
+            hosiLoopCts?.Dispose();
+            hosiLoopCts = null;
+        }
+
+        private async UniTaskVoid HosiLoopAsync(System.Threading.CancellationToken token)
+        {
             try
             {
-                // 移動アニメーション抑制 + 1f後確認.
-                playerAnimation?.SetSuppressMovement(true);
-                playerAnimation?.SetAnimatorSpeed(27.0f);
-                playerAnimation?.PlayTrigger("Iai");
-                playerAnimation?.EnsureAttackAnimation("Iai").Forget();
-
-                // ダメージを直接適用.
-                if (enemy != null && enemy.Status != null)
+                while (!token.IsCancellationRequested)
                 {
-                    float iaiDamage = playerStatusModel.strength * playerStatusModel.strengthRate * 5f;
-                    enemy.Status.OnDamaged(iaiDamage).Forget();
-
-                    // ダメージカウンター表示（Iai型）.
-                    bool facingRight = enemy.transform.position.x > playerModel.GetAvator().transform.position.x;
-                    DamageCounterPool.Instance(false)?.Spawn(
-                        enemy.transform.position, iaiDamage, PlayerAttackType.Iai, facingRight);
-
-                    Debug.Log($"[PlayerPresenter] 回避居合いダメージ適用: {iaiDamage:F0}");
-                }
-
-                // MeteorDrop中: 5secスタン + 無敵削除 + 大技中断.
-                // 怒り時専用行動中: 5secスタン（行動中断）.
-                // それ以外: 0.5sec IaiStan.
-                bool enemyStunnedLong = false; // MeteorDrop/怒りスタン時はプレイヤー即座に操作復帰.
-                if (enemy != null && enemy.Model is EnemyModel_Wendig wendigModel)
-                {
-                    if (enemy.IsMeteorDropActive)
+                    await UniTask.Delay(TimeSpan.FromSeconds(2f), cancellationToken: token);
+                    if (iaiReadyRatio >= 1f)
                     {
-                        enemyStunnedLong = true;
-                        wendigModel.AbortMeteorDrop();
-                        wendigModel.TriggerMeteorDropStan().Forget();
-                        Debug.Log("[PlayerPresenter] 回避居合い → MeteorDrop中: 5secスタン + 無敵削除 + 大技中断");
+                        playerAnimation?.PlayTrigger("hosi");
+                        Debug.Log("[PlayerPresenter] hosi ループ再生");
                     }
-                    else if (enemy.IsAngerAction)
-                    {
-                        enemyStunnedLong = true;
-                        wendigModel.TriggerStan().Forget();
-                        Debug.Log("[PlayerPresenter] 回避居合い → 怒り行動Iai: 5secスタン発動（行動中断）");
-                    }
-                    else
-                    {
-                        wendigModel.TriggerIaiStan().Forget();
-                        Debug.Log("[PlayerPresenter] 回避居合い → 敵短スタン発動（パリィ可能攻撃）");
-                    }
-                }
-
-                // 居合いSE再生.
-                guardSEPlayer?.Play("SE_Parry");
-
-                // アニメーション完了を待機（27倍速で~37ms）.
-                float iaiDuration = 1.0f;
-                await UniTask.Delay(TimeSpan.FromSeconds(iaiDuration / 27.0f));
-                playerAnimation?.ClearActionAnimatorSpeed();
-
-                // 回避パリィは素早いカウンターのため短い硬直（0.15sec）.
-                // 長時間スタン時は即復帰.
-                if (!enemyStunnedLong)
-                {
-                    await UniTask.Delay(TimeSpan.FromSeconds(0.15f));
                 }
             }
-            finally
+            catch (OperationCanceledException) { }
+        }
+
+        private async UniTaskVoid IdleFallbackAfterParryAsync()
+        {
+            await UniTask.Delay(TimeSpan.FromSeconds(0.5f));
+            if (!isIaiActive && !isHeartResisting)
             {
-                isIaiActive = false;
-                playerAnimation?.ClearActionAnimatorSpeed();
-                playerAnimation?.SetSuppressMovement(false);
-                // 0.3sec後にアイドル復帰（入力がなければ強制遷移）.
-                IdleFallbackAfterParryAsync().Forget();
+                playerAnimation?.ForceIdleState();
             }
         }
 
         /// <summary>
-        /// パリィ後0.3sec経過しても新しいアクションがなければ強制的にIdle状態に遷移.
+        /// チャンス必殺技（Enemy大技スタン中）: 9回の回避居合ループ.
+        /// 各ヒット後タイムスケール0でフリーズし、Enemyを中心に±60°以上の位置に移動して繰り返す.
+        /// 最終ヒット後: 納刀→白黒フラッシュ→扇状出血エフェクト→ダメージカウンター.
         /// </summary>
-        private async UniTaskVoid IdleFallbackAfterParryAsync()
+        private async UniTaskVoid ExecuteChanceAttackAsync()
         {
-            await UniTask.Delay(TimeSpan.FromSeconds(0.3f));
-            // 新しいアクションが開始されていなければアイドルに遷移.
-            if (!playerModel.enableAction && !isIaiActive && !isHeartResisting)
+            //Enemy取得
+            var enemy = UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>();
+            if (enemy == null || enemy.Status == null) return;
+
+            //自身を取得
+            var avator = playerModel.GetAvator();
+            if (avator == null) return;
+
+            // Rigidbody2D キャッシュ（地面埋まり防止用。isTrigger は変更しない）.
+            var avatorRb = avator.GetComponent<Rigidbody2D>();
+            var avatorCol = avator.GetComponent<Collider2D>();
+            float playerHalfHeight = avatorCol != null ? avatorCol.bounds.extents.y : 0.5f;
+            var enemyCol2D = enemy.GetComponent<Collider2D>();
+
+            playerModel.SetEnableAction(true);
+            isIaiActive = true;
+            playerAnimation?.SetSuppressMovement(true);
+            InGamePresenter.Instance.SetPlayerState(PlayerBattleState.ChanceAttack);
+
+            // 確定勝利の場合: 他の入力を即時無効化（必殺技完了まで不要）.
+            if (isLethalChanceAttack)
             {
-                playerAnimation?.ForceIdleState();
+                SetPlayerActionEnable(false);
+                Debug.Log("[PlayerPresenter] 必殺技確定勝利: 操作無効化");
             }
+
+
+
+            const int hitCount = 9;
+            const float attackDistance = 5f;
+            // ダメージ: 心拍数100以上=2500、99以下は2500→5000へ上昇（0時=5000）.
+            float chanceAttackPulse = pulseModel.GetPulseGauge();
+            float totalDamage = chanceAttackPulse >= 100f ? 2500f : Mathf.Lerp(5000f, 2500f, chanceAttackPulse / 100f);
+            float hitDamage = totalDamage / hitCount;
+            int groundMask = 1 << LayerMask.NameToLayer("Default");
+
+            Vector2 enemyPos2D = (Vector2)enemy.transform.position;
+            Vector2 playerPos2D = (Vector2)avator.transform.position;
+            // InGamePresenter 経由で Enemy Inspector 設定の軌道中心 Transform を取得.
+            // chanceAttackOrbitCenter（空obj）が設定されていればその position をそのまま使用.
+            // 未設定時は Collider2D.bounds.center（ワールド空間の物理中心）をフォールバックに使用.
+            var orbitTransform = InGamePresenter.Instance.EnemyOrbitCenter;
+            Vector2 enemyBoundsCenter = enemyCol2D != null ? (Vector2)enemyCol2D.bounds.center : enemyPos2D;
+            Vector2 orbitCenter = orbitTransform != null
+                ? (Vector2)orbitTransform.position
+                : enemyBoundsCenter;
+            float currentAngle = Mathf.Atan2(playerPos2D.y - orbitCenter.y,
+                                              playerPos2D.x - orbitCenter.x) * Mathf.Rad2Deg;
+
+            Debug.Log($"[PlayerPresenter] チャンス必殺技開始 - 1ヒットダメージ: {hitDamage:F0}, " +
+                      $"orbitCenter={orbitCenter:F2}, boundsCenter={enemyBoundsCenter:F2}, " +
+                      $"orbitTransform={(orbitTransform != null ? orbitTransform.gameObject.name : "null")}");
+
+            // 実行中のLitMotionハンドル（finally でキャンセル保険）.
+            MotionHandle moveHandle = default;
+
+            try
+            {
+                for (int i = 0; i < hitCount; i++)
+                {
+                    // ── 軌道中心を毎ヒット更新（敵の移動追従）────────────────
+                    enemyPos2D        = (Vector2)enemy.transform.position;
+                    enemyBoundsCenter = enemyCol2D != null ? (Vector2)enemyCol2D.bounds.center : enemyPos2D;
+                    orbitCenter = orbitTransform != null
+                        ? (Vector2)orbitTransform.position
+                        : enemyBoundsCenter;
+
+                    // 2回目以降: 前の軌道角度から ±60° 以上離れた有効角度を取得.
+                    if (i > 0)
+                    {
+                        currentAngle = GetValidChanceAttackAngle(
+                            orbitCenter, currentAngle, attackDistance, groundMask);
+                    }
+
+                    // ── 開始位置（軌道上）を計算・地形補正 ──────────────────
+                    float rad = currentAngle * Mathf.Deg2Rad;
+                    Vector2 startPos2D = orbitCenter + new Vector2(Mathf.Cos(rad), Mathf.Sin(rad)) * attackDistance;
+
+                    // 1. 地面 Y 補正.
+                    Vector2 rayOriginS = new Vector2(startPos2D.x, startPos2D.y + 3f);
+                    RaycastHit2D groundHitS = Physics2D.Raycast(rayOriginS, Vector2.down, 8f, groundMask);
+                    if (groundHitS.collider != null)
+                    {
+                        float safeY = groundHitS.point.y + playerHalfHeight;
+                        if (startPos2D.y < safeY) startPos2D.y = safeY;
+                    }
+                    // 2. OverlapCircle で地形内部チェック.
+                    int overlapAttempts = 0;
+                    while (Physics2D.OverlapCircle(startPos2D, playerHalfHeight * 0.5f, groundMask) != null
+                           && overlapAttempts < 5)
+                    {
+                        startPos2D.y += playerHalfHeight;
+                        overlapAttempts++;
+                    }
+                    // ─────────────────────────────────────────────────────────
+
+                    // 開始位置にテレポート.
+                    float avatorZ = avator.transform.position.z;
+                    avator.transform.position = new Vector3(startPos2D.x, startPos2D.y, avatorZ);
+                    if (avatorRb != null) avatorRb.linearVelocity = Vector2.zero;
+
+                    // Enemy方向を向く (localScale.x < 0 = 右向き).
+                    bool enemyToRight = enemyBoundsCenter.x > startPos2D.x;
+                    Vector3 ls = avator.transform.localScale;
+                    avator.transform.localScale = new Vector3(
+                        enemyToRight ? -Mathf.Abs(ls.x) : Mathf.Abs(ls.x), ls.y, ls.z);
+
+                    // ── 終了位置: orbitCenter を通り抜けた先（同距離延長）──────────────
+                    // startPos → orbitCenter の距離と同じだけ orbitCenter の先へ延長する.
+                    // → プレイヤーが敵を切り抜けるような軌跡になる.
+                    // レイキャスト（障害物）のみ最優先で終了位置を上書きする.
+                    Vector2 targetPos    = orbitTransform != null ? (Vector2)orbitTransform.position : enemyBoundsCenter;
+                    Vector2 moveDir2D    = targetPos - startPos2D;
+                    float   distToTarget = moveDir2D.magnitude;
+                    if (distToTarget > 0.01f) moveDir2D /= distToTarget;
+
+                    // 終了位置 = orbitCenter の先、startPos→orbitCenter と同距離だけ延長.
+                    float   fullDist = distToTarget * 2f;
+                    Vector2 endPos2D = startPos2D + moveDir2D * fullDist;
+
+                    // 障害物チェック（最優先）: 地形があれば手前を終了位置に更新.
+                    RaycastHit2D obstacleHit = Physics2D.Raycast(startPos2D, moveDir2D, fullDist, groundMask);
+                    float actualDist = fullDist;
+                    if (obstacleHit.collider != null)
+                    {
+                        actualDist = Mathf.Max(obstacleHit.distance - playerHalfHeight, 0.1f);
+                        endPos2D   = startPos2D + moveDir2D * actualDist;
+                    }
+                    // ─────────────────────────────────────────────────────────
+
+                    // 移動時間: 速度一定（attackDistance を baseTravelDuration 秒で移動）.
+                    // 終了位置が手前に更新されても速度は変わらず、時間が比例して短縮される.
+                    const float baseTravelDuration = 0.3f;
+                    float moveDuration = baseTravelDuration * (actualDist / Mathf.Max(fullDist, 0.001f));
+                    moveDuration = Mathf.Max(moveDuration, 0.05f);
+
+                    Vector3 startPos3D = new Vector3(startPos2D.x, startPos2D.y, avatorZ);
+                    Vector3 endPos3D   = new Vector3(endPos2D.x,   endPos2D.y,   avatorZ);
+
+                    // 切断エフェクト（開始位置を起点にプレイヤーを追跡し移動中に伸びる）.
+                    ChanceAttackSlashEffect.SpawnTracking(startPos3D, avator.transform, moveDuration);
+
+                    // 居合アニメーション開始（LitMotion 移動と同時）.
+                    playerAnimation?.SetAnimatorSpeed(27.0f);
+                    playerAnimation?.PlayTrigger("Iai");
+
+                    // LitMotion で開始位置 → 終了位置へ移動（加速突進）.
+                    moveHandle = LMotion.Create(startPos3D, endPos3D, moveDuration)
+                        .WithEase(Ease.InQuad)
+                        .BindToPosition(avator.transform);
+                    await moveHandle.ToUniTask();
+                    moveHandle = default;
+
+                    playerAnimation?.ClearActionAnimatorSpeed();
+                    if (avatorRb != null) avatorRb.linearVelocity = Vector2.zero;
+
+                    // ダメージは全ヒット後に一括適用（DamageCounter 出現タイミング）.
+                    guardSEPlayer?.Play("SE_Parry");
+
+                    Debug.Log($"[PlayerPresenter] チャンス必殺技 ヒット {i + 1}/{hitCount} - " +
+                              $"start={startPos2D:F2}, end={endPos2D:F2}, dist={actualDist:F2}sec={moveDuration:F2}");
+
+                    if (i < hitCount - 1)
+                    {
+                        // 到達後フリーズ（ヒット演出）. 遅延時間は移動距離と独立.
+                        Time.timeScale = 0f;
+
+                        // 間隔: 0.5sec → 0.2sec（6回目で到達）.
+                        float t        = Mathf.Clamp01(i / 5.0f);
+                        float interval = Mathf.Lerp(0.5f, 0.2f, t);
+
+                        await UniTask.Delay(
+                            TimeSpan.FromSeconds(interval), Cysharp.Threading.Tasks.DelayType.UnscaledDeltaTime);
+
+                        Time.timeScale = 1f;
+                    }
+                }
+
+                // === 9ヒット完了後の演出 ===
+
+                // 納刀アニメーション
+                playerAnimation?.PlayTrigger("sheathing_of_sword");
+
+                // 0.5sec待機
+                await UniTask.Delay(TimeSpan.FromSeconds(0.5f));
+
+                // 白黒フラッシュ (Fillモード: 背景白/オブジェクト黒、0.2sec、演出中は時間停止)
+                FullscreenBlackEffectFeature.FillEnabled    = true;
+                FullscreenBlackEffectFeature.Blend          = 1f;
+                FullscreenBlackEffectFeature.GrayscaleRatio = 0f;
+                FullscreenBlackEffectFeature.IsEnabled      = true;
+                Time.timeScale = 0f;
+                await UniTask.Delay(TimeSpan.FromSeconds(0.2f), ignoreTimeScale: true);
+                Time.timeScale = 1f;
+                FullscreenBlackEffectFeature.Blend          = 0f;
+                FullscreenBlackEffectFeature.IsEnabled      = false;
+
+                // 必殺技後: 心拍数を100にリセット.
+                pulseModel.SetPulseGauge(pulseModel.GetBasePulseGauge());
+
+                // 出血エフェクト 9個: 上方向扇状
+                // 5個 (先行: -80, -40, 0, +40, +80度)
+                Vector3 bleedPos = enemy.transform.position;
+                float[] firstFanAngles  = { -80f, -40f, 0f, 40f, 80f };
+                float[] secondFanAngles = { -60f, -20f, 20f, 60f };
+
+                foreach (float a in firstFanAngles)
+                {
+                    BloodSplatterPool.Instance(false)?.Spawn(
+                        bleedPos, ChanceAttackRotateVec(Vector2.up, a), Vector2.up);
+                }
+
+                // 0.25sec後に残り4個 (-60, -20, +20, +60度)
+                await UniTask.Delay(TimeSpan.FromSeconds(0.25f));
+
+                foreach (float a in secondFanAngles)
+                {
+                    BloodSplatterPool.Instance(false)?.Spawn(
+                        bleedPos, ChanceAttackRotateVec(Vector2.up, a), Vector2.up);
+                }
+
+                // 全ダメージを一括適用（DamageCounter 出現タイミング）.
+                enemy.Status.OnDamaged(totalDamage).Forget();
+
+                // ダメージカウンター: 9個 個別 + 合計1個
+                bool facingRight = enemy.transform.position.x > avator.transform.position.x;
+                for (int i = 0; i < hitCount; i++)
+                {
+                    float angleOffset = (i - 4) * 10f; // -40 〜 +40度
+                    DamageCounterPool.Instance(false)?.Spawn(
+                        enemy.transform.position, hitDamage,
+                        PlayerAttackType.Iai, facingRight, angleOffset);
+                }
+                // 合計カウンター (少し上にオフセット)
+                DamageCounterPool.Instance(false)?.Spawn(
+                    enemy.transform.position + Vector3.up * 1.5f,
+                    totalDamage, PlayerAttackType.Iai, facingRight);
+
+                Debug.Log($"[PlayerPresenter] チャンス必殺技完了 - 合計ダメージ: {totalDamage:F0}");
+            }
+            finally
+            {
+                if (moveHandle.IsActive()) moveHandle.Cancel();
+                Time.timeScale = 1f;
+                isIaiActive = false;
+                playerAnimation?.ClearActionAnimatorSpeed();
+                playerAnimation?.SetSuppressMovement(false);
+                playerModel.SetEnableAction(false);
+                playerAnimation?.PlayTrigger("IaiEnd");
+                IdleFallbackAfterParryAsync().Forget();
+                InGamePresenter.Instance.SetPlayerState(PlayerBattleState.Idle);
+
+                // 確定勝利: 特殊勝利演出を開始（白黒演出なし、0.5sec後ズーム）.
+                if (isLethalChanceAttack)
+                {
+                    isLethalChanceAttack = false;
+                    InGame.Common.DeathManager.Instance.NotifyEnemyDeathSpecial().Forget();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Enemyを中心に currentAngle から ±60°以上離れた、
+        /// Physics2D.Raycastでスペースが確認できる角度を返す.
+        /// </summary>
+        private float GetValidChanceAttackAngle(
+            Vector2 orbitCenter, float currentAngle, float distance, int layerMask)
+        {
+            const int   maxAttempts  = 12;   // 試行回数増加
+            const float minAngleDiff = 60f;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                float sign   = UnityEngine.Random.value > 0.5f ? 1f : -1f;
+                float offset = sign * UnityEngine.Random.Range(minAngleDiff, 180f);
+                float candidateAngle = currentAngle + offset;
+
+                if (IsChanceAngleValid(orbitCenter, candidateAngle, distance, layerMask))
+                    return candidateAngle;
+            }
+
+            // フォールバック候補を順に検証して最初に有効なものを返す.
+            float[] fallbacks = { currentAngle + 180f, 90f, 270f, 45f, 135f };
+            foreach (float fb in fallbacks)
+            {
+                if (IsChanceAngleValid(orbitCenter, fb, distance, layerMask))
+                    return fb;
+            }
+
+            return currentAngle + 180f; // 最終フォールバック（全検証失敗時）.
+        }
+
+        /// <summary>
+        /// 指定角度のテレポート先が地形と重ならないかを確認する.
+        ///   1. orbitCenter → 候補位置 へのレイキャストが通る
+        ///   2. 候補位置が OverlapCircle で地形内部でない
+        /// </summary>
+        private static bool IsChanceAngleValid(
+            Vector2 orbitCenter, float angleDeg, float distance, int layerMask)
+        {
+            float   rad  = angleDeg * Mathf.Deg2Rad;
+            Vector2 dir  = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
+            Vector2 dest = orbitCenter + dir * distance;
+
+            // 経路チェック: 中間に地形があれば無効.
+            RaycastHit2D pathHit = Physics2D.Raycast(orbitCenter, dir, distance + 0.5f, layerMask);
+            if (pathHit.collider != null) return false;
+
+            // 到着点チェック: 地形内部なら無効.
+            if (Physics2D.OverlapPoint(dest, layerMask) != null) return false;
+
+            return true;
+        }
+
+        /// <summary>Vector2 を指定角度（度）回転させる.</summary>
+        private static Vector2 ChanceAttackRotateVec(Vector2 v, float angleDeg)
+        {
+            float r   = angleDeg * Mathf.Deg2Rad;
+            float cos = Mathf.Cos(r);
+            float sin = Mathf.Sin(r);
+            return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
         }
 
         /// <summary>

@@ -31,6 +31,13 @@ public class EnemState_Wendig_Howling : EnemState_abstract
 
         float animSpeed = enemyModel.AnimSpeed;
 
+        // プレイヤーの方を向く.
+        var player = Object.FindFirstObjectByType<InGame.Player.PlayerScope>();
+        if (player != null)
+        {
+            EnemFacingHelper.FaceToward(enemyModel.Presenter.transform, player.transform.position);
+        }
+
         // Howlingアニメーション開始.
         enemyModel.Animator.SetTrigger("Howling");
 

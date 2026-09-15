@@ -5,7 +5,14 @@ namespace Tutorial
     /// </summary>
     public interface ITutorialContent
     {
-        /// <summary>ウィンドウタイトル.</summary>
+        /// <summary>
+        /// 言語に依存しない安定したコンテンツID.
+        /// TutorialManager 内部でのページ一致判定に使用する（言語切り替えの影響を受けない）.
+        /// 例: "move", "jump", "dodge", "recovery"
+        /// </summary>
+        string ContentId { get; }
+
+        /// <summary>ウィンドウタイトル（現在の言語で返す）.</summary>
         string Title { get; }
 
         /// <summary>

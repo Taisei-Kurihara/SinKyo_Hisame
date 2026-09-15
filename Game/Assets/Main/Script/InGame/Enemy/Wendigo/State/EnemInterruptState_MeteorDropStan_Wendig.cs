@@ -5,14 +5,12 @@ using Cysharp.Threading.Tasks;
 // 空中にいる場合は落下→着地してからスタン時間のカウントを開始する.
 public class EnemInterruptState_MeteorDropStan_Wendig : EnemInterruptState_Stan_abstract
 {
-    // 着地判定用.
-    private int groundLayerMask = -1;
-    private const float groundCheckDistance = 0.5f;
-
     public EnemInterruptState_MeteorDropStan_Wendig()
     {
         stanBoolName = "Stan";
         stanDuration = 5f;
+        // 長時間スタン = チャンス状態のトリガー（InGamePresenter 経由で通知）.
+        battleStateOnStan = EnemyBattleState.StunLong;
     }
 
     protected override async UniTask OnStanProcess(EnemyModel_abstract enemyModel)
@@ -40,7 +38,7 @@ public class EnemInterruptState_MeteorDropStan_Wendig : EnemInterruptState_Stan_
         }
 
         // 空中にいる場合: 落下→着地を待ってからスタンカウント開始.
-        if (rb != null && !IsOnGround(enemyModel))
+        if (rb != null && !EnemState_abstract.IsOnGround(transform))
         {
             // Y軸制約を解除して落下可能にする.
             rb.constraints &= ~RigidbodyConstraints2D.FreezePositionY;
@@ -49,20 +47,10 @@ public class EnemInterruptState_MeteorDropStan_Wendig : EnemInterruptState_Stan_
 
             Debug.Log($"[MeteorDropStan] 空中検知 → 落下開始");
 
-            // 着地待ちループ.
-            float timeout = 3f;
-            float elapsed = 0f;
-            while (elapsed < timeout)
-            {
-                if (enemyModel == null) return;
-                if (IsOnGround(enemyModel)) break;
-                await UniTask.Yield();
-                elapsed += Time.deltaTime;
-            }
+            // 着地待機（基底クラスの共通メソッド使用: Default レイヤーのみ、中心からレイキャスト）.
+            bool landed = await EnemState_abstract.WaitForLandingAsync(enemyModel, transform, rb, 3f);
 
-            // 着地: 速度をゼロに.
-            if (rb != null) rb.linearVelocity = Vector2.zero;
-            Debug.Log($"[MeteorDropStan] 着地確認 (elapsed: {elapsed:F2}s)");
+            Debug.Log($"[MeteorDropStan] 着地確認 (landed: {landed})");
         }
 
         // 着地状態をアニメーターに反映.
@@ -79,35 +67,4 @@ public class EnemInterruptState_MeteorDropStan_Wendig : EnemInterruptState_Stan_
         await UniTask.Delay((int)(stanDuration * 1000));
     }
 
-    /// <summary>
-    /// 足元レイキャストで着地判定.
-    /// </summary>
-    private bool IsOnGround(EnemyModel_abstract enemyModel)
-    {
-        var transform = enemyModel?.Presenter?.transform;
-        if (transform == null) return true;
-
-        // レイヤーマスク初期化.
-        if (groundLayerMask == -1)
-        {
-            int platformLayer = LayerMask.NameToLayer("Platform");
-            int defaultLayer = LayerMask.NameToLayer("Default");
-            groundLayerMask = (1 << platformLayer) | (1 << defaultLayer);
-        }
-
-        // 足元座標を算出.
-        Vector2 feetPos;
-        var col = enemyModel.GetComponent<Collider2D>();
-        if (col != null)
-        {
-            feetPos = new Vector2(col.bounds.center.x, col.bounds.min.y);
-        }
-        else
-        {
-            feetPos = (Vector2)transform.position;
-        }
-
-        RaycastHit2D hit = Physics2D.Raycast(feetPos, Vector2.down, groundCheckDistance, groundLayerMask);
-        return hit.collider != null;
-    }
 }

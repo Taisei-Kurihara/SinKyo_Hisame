@@ -62,6 +62,32 @@ namespace InGame.Player
             isDecreaseRecovering = true;
         }
 
+        // ---- 閾値倍率 ----
+
+        /// <summary>
+        /// 鼓動ゲージ閾値に応じた上昇量倍率.
+        /// 175以上: ×0.35, 25以下: ×1.25, それ以外: ×1.0.
+        /// </summary>
+        private float GetIncreaseMultiplier()
+        {
+            float pulse = pulseGauge.Value;
+            if (pulse >= 175f) return 0.35f;
+            if (pulse <= 25f) return 1.25f;
+            return 1f;
+        }
+
+        /// <summary>
+        /// 鼓動ゲージ閾値に応じた減少量倍率.
+        /// 175以上: ×1.25, 25以下: ×0.75, それ以外: ×1.0.
+        /// </summary>
+        private float GetDecreaseMultiplier()
+        {
+            float pulse = pulseGauge.Value;
+            if (pulse >= 175f) return 1.25f;
+            if (pulse <= 25f) return 0.75f;
+            return 1f;
+        }
+
         // ---- 鼓動上昇条件 ----
 
         public void Stun()
@@ -70,41 +96,43 @@ namespace InGame.Player
         }
 
         /// <summary>
-        /// 攻撃を振る（Hit）: +0.5.
+        /// 攻撃を振る（Hit）: +1.5（閾値倍率適用）.
         /// </summary>
         public void OnAttackHit()
         {
-            pulseGauge.Value = Math.Clamp(pulseGauge.Value + 0.5f * rate, minPulseGauge, maxPulseGauge);
+            float increase = 0.5f * rate * GetIncreaseMultiplier();
+            pulseGauge.Value = Math.Clamp(pulseGauge.Value + increase, minPulseGauge, maxPulseGauge);
             OnPulseIncreased();
         }
 
         /// <summary>
-        /// 攻撃を振る（Miss）: +1.
+        /// 攻撃を振る（Miss）: +3（閾値倍率適用）.
         /// </summary>
         public void OnAttackMiss()
         {
-            pulseGauge.Value = Math.Clamp(pulseGauge.Value + 1f * rate, minPulseGauge, maxPulseGauge);
-            OnPulseIncreased();
-        }
-
-        /// <summary>
-        /// 敵からの攻撃を受ける: 現在の鼓動値×0.3.
-        /// </summary>
-        public void OnDamageTaken()
-        {
-            float before = pulseGauge.Value;
-            float increase = pulseGauge.Value * 0.3f;
+            float increase = 1f * rate * GetIncreaseMultiplier();
             pulseGauge.Value = Math.Clamp(pulseGauge.Value + increase, minPulseGauge, maxPulseGauge);
-            Debug.Log($"[PulseModel] OnDamageTaken - 被弾鼓動上昇: {before} → {pulseGauge.Value} (+{increase})");
             OnPulseIncreased();
         }
 
         /// <summary>
-        /// 回避: +1.5.
+        /// 敵からの攻撃を受ける: 受けた減少HP×0.25（閾値倍率適用）.
+        /// </summary>
+        /// <param name="hpLost">被弾で失ったHP量.</param>
+        public void OnDamageTaken(float hpLost)
+        {
+            float increase = hpLost * 0.25f * GetIncreaseMultiplier();
+            pulseGauge.Value = Math.Clamp(pulseGauge.Value + increase, minPulseGauge, maxPulseGauge);
+            OnPulseIncreased();
+        }
+
+        /// <summary>
+        /// 回避: +4.5（閾値倍率適用）.
         /// </summary>
         public void OnDodge()
         {
-            pulseGauge.Value = Math.Clamp(pulseGauge.Value + 1.5f * rate, minPulseGauge, maxPulseGauge);
+            float increase = 1.5f * rate * GetIncreaseMultiplier();
+            pulseGauge.Value = Math.Clamp(pulseGauge.Value + increase, minPulseGauge, maxPulseGauge);
             OnPulseIncreased();
         }
 
@@ -140,7 +168,7 @@ namespace InGame.Player
                 }
             }
 
-            float decrease = currentIdleDecrease * deltaTime;
+            float decrease = currentIdleDecrease * deltaTime * GetDecreaseMultiplier();
             // 100未満にはならない.
             pulseGauge.Value = Math.Max(pulseGauge.Value - decrease, basePulseGauge);
         }

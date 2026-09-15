@@ -32,6 +32,15 @@ namespace InGame.Player
         [SerializeField]
         TextMeshProUGUI heartText;
 
+        [Header("心拍数ラベル（言語切り替え対応）")]
+        [SerializeField]
+        TextMeshProUGUI heartRateLabelText;
+
+        // 心拍数ラベル翻訳 { JP, EN }.
+        // EN は枠の都合上2行表示。･ は JP の " : " に相当する区切り文字.
+        private static readonly string[] heartRateLabelTexts =
+            { "心拍数 :", "heart･\nrate･" };
+
         [SerializeField]
         DrainUI drainUI;
 
@@ -72,6 +81,11 @@ namespace InGame.Player
         private Color overlayCurrentColor = new Color(0f, 0f, 0f, 0f);
         private float overlayPhase = 0f;
         private const float overlaySmoothRate = 3f;
+
+        // Heart暗背景対策: heart Animatorから自動設定.
+        // heartRate 26~174 の範囲で白表示、範囲外は通常表示.
+        private Material heartDarkBGInstance;
+        private bool heartDarkBGActive = true;
 
         [Header("血管エフェクト（高心拍数時）")]
         [SerializeField] private Material bloodVesselsMaterial;
@@ -146,6 +160,20 @@ namespace InGame.Player
                 dpsText.gameObject.SetActive(false);
             }
 
+            // Heart暗背景対策: heart Animatorの gameObject から Image を取得し、
+            // HeartDarkBGOutline シェーダーマテリアルを自動生成・常時有効で設定.
+            if (heart != null)
+            {
+                var img = heart.gameObject.GetComponent<Image>();
+                Shader darkBGShader = Shader.Find("UI/HeartDarkBGOutline");
+                if (img != null && darkBGShader != null)
+                {
+                    heartDarkBGInstance = new Material(darkBGShader);
+                    heartDarkBGInstance.SetFloat("_EffectEnabled", 1f);
+                    img.material = heartDarkBGInstance;
+                }
+            }
+
             // 心音AudioSource 2つを生成.
             heartbeatSourceA = gameObject.AddComponent<AudioSource>();
             heartbeatSourceA.playOnAwake = false;
@@ -159,6 +187,14 @@ namespace InGame.Player
 
             // 心音クリップをAddressablesから非同期ロード.
             LoadHeartbeatClipAsync().Forget();
+
+            // 言語切り替えイベント購読 + 起動時ラベル適用.
+            var lm = global::Common.LanguageManager.Instance(false);
+            if (lm != null)
+            {
+                lm.OnLanguageChanged += OnHeartRateLabelLanguageChanged;
+                OnHeartRateLabelLanguageChanged(lm.CurrentLanguage);
+            }
         }
 
         private async UniTaskVoid LoadHeartbeatClipAsync()
@@ -205,6 +241,14 @@ namespace InGame.Player
             }
 
             heartText.text = heartRate.ToString();
+
+            // Heart暗背景対策: 心拍26~174の範囲で白表示ON/OFF.
+            if (heartDarkBGInstance != null)
+            {
+                bool shouldApply = heartRate >= 26 && heartRate <= 174;
+                heartDarkBGInstance.SetFloat("_EffectEnabled", shouldApply ? 1f : 0f);
+                heartDarkBGActive = shouldApply;
+            }
 
             // fillAmountを0.25～0.805の範囲に変換（目標値を保持、Updateで補間）.
             if (heartGage != null)
@@ -274,6 +318,21 @@ namespace InGame.Player
                     float halfHp = enemyPresenter.Status.hp.Value * 0.5f;
                     enemyPresenter.Status.OnDamaged(halfHp).Forget();
                     Debug.Log($"[PlayerView] デバッグ: Enemy HP半分 ({enemyPresenter.Status.hp.Value} → {enemyPresenter.Status.hp.Value - halfHp})");
+                }
+            }
+            // デバッグ: Xキーで Enemy に長時間スタン（MeteorDropStan / StunLong）を強制発動.
+            if (Input.GetKeyDown(KeyCode.X))
+            {
+                var enemyPresenter = UnityEngine.Object.FindFirstObjectByType<EnemyPresenter_abstract>();
+                var wendigModel = enemyPresenter?.Model as EnemyModel_Wendig;
+                if (wendigModel != null)
+                {
+                    wendigModel.TriggerMeteorDropStan().Forget();
+                    Debug.Log("[PlayerView] デバッグ: Enemy 長時間スタン (MeteorDropStan) 強制発動");
+                }
+                else
+                {
+                    Debug.LogWarning("[PlayerView] デバッグ: EnemyModel_Wendig が取得できませんでした");
                 }
             }
 #endif
@@ -666,6 +725,20 @@ namespace InGame.Player
                 Addressables.Release(heartbeatSlowHandle);
             if (heartbeatFastHandle.IsValid())
                 Addressables.Release(heartbeatFastHandle);
+
+            var lm = global::Common.LanguageManager.Instance(false);
+            if (lm != null)
+                lm.OnLanguageChanged -= OnHeartRateLabelLanguageChanged;
+        }
+
+        /// <summary>
+        /// 言語変更時に心拍数ラベルを更新.
+        /// JP: "心拍数 :"  /  EN: "heart･\nrate･"（2行・枠幅対応）.
+        /// </summary>
+        private void OnHeartRateLabelLanguageChanged(GameLanguage lang)
+        {
+            if (heartRateLabelText != null)
+                heartRateLabelText.text = heartRateLabelTexts[lang == GameLanguage.English ? 1 : 0];
         }
 
         // ---- DPS計測 ----

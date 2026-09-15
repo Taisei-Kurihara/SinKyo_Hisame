@@ -42,6 +42,7 @@ namespace SceneInfo
             await playerEffectPool.InitPool("PlayerEffect_Heal", 3);
             await playerEffectPool.InitPool("UP", 2);
             await playerEffectPool.InitPool("Down", 2);
+            await playerEffectPool.InitPool("BlueAura", 1);
             Debug.Log("[MainSceneInfo] エフェクトプール初期化完了 → BGM読み込み開始");
 
             // ゲーム中はチュートリアルウィンドウを非表示で開始.

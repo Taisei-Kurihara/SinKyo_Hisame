@@ -40,9 +40,10 @@ namespace Tutorial
         {
             new TutorialContent_Controls(),
             new TutorialContent_Move(),
+            new TutorialContent_Jump(),
+            new TutorialContent_Dodge(),
             new TutorialContent_WeakAttack(),
             new TutorialContent_StrongAttack(),
-            new TutorialContent_Dodge(),
             new TutorialContent_Recovery(),
             new TutorialContent_Parry(),
             new TutorialContent_HeartRateRise(),
@@ -50,11 +51,12 @@ namespace Tutorial
             new TutorialContent_HeartResist(),
             new TutorialContent_HeartResistStrong(),
             new TutorialContent_Iai(),
+            new TutorialContent_ChanceState(),
             new TutorialContent_AbsorbGauge(),
             new TutorialContent_HeartRateZero(),
         };
 
-        private TutorialView view;
+        private TutorialWindow view;
         private int currentIndex = 0;
 
         // チュートリアルシーンモード.
@@ -93,8 +95,8 @@ namespace Tutorial
         /// <summary>最後のページかどうか.</summary>
         public bool IsLast => currentIndex >= tutorials.Count - 1;
 
-        /// <summary>登録済みの TutorialView 参照.</summary>
-        public TutorialView View => view;
+        /// <summary>登録済みの TutorialWindow 参照.</summary>
+        public TutorialWindow View => view;
 
         /// <summary>現在のフェーズ.</summary>
         public TutorialPhase CurrentPhase => currentPhase;
@@ -105,11 +107,11 @@ namespace Tutorial
         // ---- 公開 API ----
 
         /// <summary>
-        /// TutorialView を登録する（TutorialView.Awake から呼ばれる）.
+        /// TutorialWindow を登録する（TutorialWindow.Awake から呼ばれる）.
         /// </summary>
-        public void RegisterView(TutorialView tutorialView)
+        public void RegisterView(TutorialWindow tutorialWindow)
         {
-            view = tutorialView;
+            view = tutorialWindow;
             Debug.Log("[TutorialManager] View登録完了");
         }
 
@@ -160,7 +162,7 @@ namespace Tutorial
             {
                 for (int i = 0; i < tutorials.Count; i++)
                 {
-                    if (tutorials[i].Title.StartsWith("移動"))
+                    if (tutorials[i].ContentId == "move")
                     {
                         currentIndex = i;
                         break;
@@ -249,7 +251,7 @@ namespace Tutorial
         /// </summary>
         public void HideTutorial()
         {
-            view?.Window?.Hide();
+            view?.HidePanel();
             Time.timeScale = 1f;
             currentPhase = TutorialPhase.Idle;
 
@@ -295,7 +297,7 @@ namespace Tutorial
 
             isPausedDuringMonitoring = false;
             currentPhase = TutorialPhase.MonitoringInput;
-            view?.Window?.Hide();
+            view?.HidePanel();
             Time.timeScale = 1f;
 
             // 監視中: player操作有効、UI操作無効.
@@ -312,7 +314,7 @@ namespace Tutorial
         /// </summary>
         public void EndTutorial()
         {
-            view?.Window?.Hide();
+            view?.HidePanel();
             Time.timeScale = 1f;
             currentPhase = TutorialPhase.Idle;
             isTutorialScene = false;
@@ -442,7 +444,11 @@ namespace Tutorial
                 currentPhase = TutorialPhase.MonitoringInput;
                 inputCompleted = false;
                 content.ResetMonitoring();
-                view?.Window?.Hide();
+
+                // チュートリアル別の開始時リセット.
+                ApplyTutorialStartResets(content);
+
+                view?.HidePanel();
                 Time.timeScale = 1f;
 
                 // 監視中: player操作有効、UI操作無効.
@@ -465,6 +471,10 @@ namespace Tutorial
         private void OnInputCompleted()
         {
             var content = tutorials[currentIndex];
+
+            // チュートリアル別の完了時リセット.
+            ApplyTutorialEndResets(content);
+
             if (content.CountsForCompletion)
                 completedCount++;
             UpdateCompletionRateText();
@@ -520,6 +530,50 @@ namespace Tutorial
             UpdateCompletionRateText();
         }
 
+        // ---- チュートリアル別リセット ----
+
+        /// <summary>
+        /// チュートリアル入力監視開始時のリセット処理.
+        /// </summary>
+        private void ApplyTutorialStartResets(ITutorialContent content)
+        {
+            var pm = PlayerManager.Instance(false);
+            if (pm == null) return;
+
+            // 回復チュートリアル: 回復ポイントを最大値(3)に戻す.
+            if (content.ContentId == "recovery")
+            {
+                pm.playerStatusModel?.SetHeal(pm.playerStatusModel.healPointMax);
+            }
+
+            // 心拍系チュートリアル: 心拍数を100に戻す.
+            if (IsHeartRelatedTutorial(content))
+            {
+                pm.pulseModel?.ResetToBase();
+            }
+        }
+
+        /// <summary>
+        /// チュートリアル入力監視完了時のリセット処理.
+        /// </summary>
+        private void ApplyTutorialEndResets(ITutorialContent content)
+        {
+            // 心拍系チュートリアル: 心拍数を100に戻す.
+            if (IsHeartRelatedTutorial(content))
+            {
+                PlayerManager.Instance(false)?.pulseModel?.ResetToBase();
+            }
+        }
+
+        /// <summary>
+        /// 心拍関連チュートリアルかどうか判定.
+        /// </summary>
+        private static bool IsHeartRelatedTutorial(ITutorialContent content)
+        {
+            var id = content.ContentId;
+            return id == "heart_resist" || id == "heart_resist_strong" || id == "iai";
+        }
+
         // ---- 内部処理 ----
 
         /// <summary>
@@ -557,15 +611,13 @@ namespace Tutorial
 
         private async UniTaskVoid ShowCurrentAsync()
         {
-            var w = view?.Window;
-            if (w == null)
+            if (view == null)
             {
                 Debug.LogWarning("[TutorialManager] TutorialWindow が登録されていません。");
                 return;
             }
 
-            w.Show();
-            await w.DisplayAsync(tutorials[currentIndex]);
+            await view.ShowContentAsync(tutorials[currentIndex]);
         }
 
         private void UpdateCompletionRateText()
@@ -574,12 +626,16 @@ namespace Tutorial
 
             int countableTotal = 0;
             foreach (var t in tutorials) { if (t.CountsForCompletion) countableTotal++; }
-            var text = $"チュートリアルを完了する ({completedCount}/{countableTotal})";
+
+            bool isEN = Common.LanguageManager.Instance(false)?.CurrentLanguage == GameLanguage.English;
+            var text = isEN
+                ? $"Complete Tutorial ({completedCount}/{countableTotal})"
+                : $"チュートリアルを完了する ({completedCount}/{countableTotal})";
 
             if (currentIndex >= 0 && currentIndex < tutorials.Count)
             {
                 var content = tutorials[currentIndex];
-                string suffix = inputCompleted ? "(完)" : "";
+                string suffix = inputCompleted ? (isEN ? "(Done)" : "(完)") : "";
 
                 if (!string.IsNullOrEmpty(content.OperationName))
                     text += $"\n{content.OperationName}{suffix}";

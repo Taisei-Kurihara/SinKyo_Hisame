@@ -862,7 +862,8 @@ namespace InGame.Player
         /// <summary>
         /// 居合ダメージ計算: 基礎攻撃力 × (1 + 鼓動ボーナス) × 高心拍ペナルティ.
         /// 鼓動ボーナス = min(2.5, max(0, (100 - 現在鼓動) × 0.025)).
-        /// 高心拍ペナルティ = 心拍100以上で段階的に減少（100→1.0, 200→0.5）.
+        /// 高心拍ペナルティ = 心拍100以上で指数関数的に急減衰.
+        ///   100→1.0倍, 110→≈0.067倍(damage≈20), 120→≈0.0倍.
         /// </summary>
         private float CalculateIaiDamage()
         {
@@ -874,13 +875,13 @@ namespace InGame.Player
             float pulseReduction = Mathf.Max(0f, 100f - currentPulse);
             float bonusMultiplier = Mathf.Min(2.5f, pulseReduction * 0.025f);
 
-            // 高心拍ペナルティ: 心拍100以上で段階的に攻撃力減少.
-            // 100→1.0倍, 150→0.75倍, 200→0.5倍（線形補間）.
+            // 高心拍ペナルティ: 心拍100以上で指数関数的に急減衰.
+            // e^(-0.27 * overPulse): 100→1.0, 110→0.067(≈20dmg), 120→0.0045.
             float highPulsePenalty = 1f;
             if (currentPulse >= 100f)
             {
-                float overPulse = Mathf.Clamp(currentPulse - 100f, 0f, 100f);
-                highPulsePenalty = Mathf.Lerp(1f, 0.5f, overPulse / 100f);
+                float overPulse = currentPulse - 100f;
+                highPulsePenalty = Mathf.Exp(-0.27f * overPulse);
             }
 
             // 基礎攻撃力に上乗せ (加算式) × 居合ダメージ倍率3倍 × 高心拍ペナルティ.

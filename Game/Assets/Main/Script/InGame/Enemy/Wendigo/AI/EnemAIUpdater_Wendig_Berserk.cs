@@ -47,6 +47,10 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
     private float lastMeteorDropTime = -100f;
     private const float meteorDropLotteryCooldown = 10f;
 
+    // MeteorDrop行動カウント制限: 8回以上他の行動を行った後でないと抽選不可.
+    private int actionsSinceMeteorDrop = 0;
+    private const int minActionsBeforeMeteorDrop = 8;
+
     // カメラ範囲設定.
     private float cameraViewRangeX = 8f;
     private float cameraViewRangeY = 5f;
@@ -66,6 +70,9 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
     // 連続攻撃防止用.
     private int lastMeleeAttackType = -1;
+
+    // ジャンプ切連続使用制限: 直前の攻撃がジャンプ切だった場合true.
+    private bool lastActionWasJumpSlash = false;
 
     // 基本移動速度.
     private const float baseMoveSpeed = 3f;
@@ -113,8 +120,10 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
         lastRushEndTime = -100f;
         pendingMeteorDrop = true; // 暴走突入時にMeteorDrop(大技)を必ず使用.
         lastMeteorDropTime = -100f;
+        actionsSinceMeteorDrop = 0;
         meleeAttacksSinceLastRush = 0;
         lastMeleeAttackType = -1;
+        lastActionWasJumpSlash = false;
         // 怒りゲージリセット.
         angerGauge = 0f;
         isAngry = false;
@@ -345,6 +354,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
                     presenterMDEnd.IsAngerAction = false;
                 selectedSetting.ConsumeRepeat();
                 lastMeteorDropTime = Time.time;
+                actionsSinceMeteorDrop = 0;
                 randomMoveCount = 0;
                 currentActionSetting = null;
                 return;
@@ -352,13 +362,37 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
             if (selectedSetting.actionState is EnemState_Wendig_JumpSlash jumpSlash)
             {
+                if (lastActionWasJumpSlash)
+                {
+                    // ジャンプ切連続使用制限: Howlingで代替（待機0）.
+                    if (ownerModel is EnemyModel_Wendig wendigModelJsReplace)
+                    {
+                        Debug.Log("[WendigBerserkUpdater] ジャンプ切連続 → Howling代替(待機0)");
+                        var howling = WendigMasterAI.HowlingState;
+                        int origWait = howling.PostActionWaitFrames;
+                        howling.PostActionWaitFrames = 0;
+                        await wendigModelJsReplace.TriggerHowling();
+                        howling.PostActionWaitFrames = origWait;
+                    }
+                    lastActionWasJumpSlash = false;
+                    actionsSinceMeteorDrop++;
+                    randomMoveCount = 0;
+                    currentActionSetting = null;
+                    return;
+                }
+
                 jumpSlash.SetTargetPosition(targetPos);
                 await selectedSetting.actionState.Act(ownerModel);
                 selectedSetting.ConsumeRepeat();
+                lastActionWasJumpSlash = true;
+                actionsSinceMeteorDrop++;
                 randomMoveCount = 0;
                 currentActionSetting = null;
                 return;
             }
+
+            // ジャンプ切以外の攻撃 → 連続制限リセット.
+            lastActionWasJumpSlash = false;
 
             if (selectedSetting.actionState is EnemState_Wendig_Rush rush)
             {
@@ -366,6 +400,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
                 await selectedSetting.actionState.Act(ownerModel);
                 selectedSetting.ConsumeRepeat();
                 meleeAttacksSinceLastRush = 0;
+                actionsSinceMeteorDrop = System.Math.Max(0, actionsSinceMeteorDrop - 1);
                 randomMoveCount = 0;
                 lastRushEndTime = Time.time;
                 currentActionSetting = null;
@@ -384,6 +419,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
                 }
                 selectedSetting.ConsumeRepeat();
                 meleeAttacksSinceLastRush++;
+                actionsSinceMeteorDrop++;
                 randomMoveCount = 0;
                 currentActionSetting = null;
                 return;
@@ -391,6 +427,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
             await selectedSetting.actionState.Act(ownerModel);
             selectedSetting.ConsumeRepeat();
+            actionsSinceMeteorDrop++;
             randomMoveCount = 0;
         }
         else
@@ -434,12 +471,16 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
                 float newDistance = ownerTransform != null ? Vector3.Distance(ownerTransform.position, TargetPosition) : float.MaxValue;
                 if (newDistance <= moveActionSetting.activationDistance)
                 {
+                    // 移動後攻撃 → ジャンプ切連続制限リセット.
+                    lastActionWasJumpSlash = false;
+
                     if (moveActionSetting.actionState is EnemState_Wendig_Rush rush)
                     {
                         rush.SetStageEdge(ownerModel.StageMin.x, ownerModel.StageMax.x);
                         await moveActionSetting.actionState.Act(ownerModel);
                         moveActionSetting.ConsumeRepeat();
                         meleeAttacksSinceLastRush = 0;
+                        actionsSinceMeteorDrop = System.Math.Max(0, actionsSinceMeteorDrop - 1);
                         randomMoveCount = 0;
                         lastRushEndTime = Time.time;
                         currentActionSetting = null;
@@ -458,6 +499,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
                         }
                         moveActionSetting.ConsumeRepeat();
                         meleeAttacksSinceLastRush++;
+                        actionsSinceMeteorDrop++;
                         randomMoveCount = 0;
                         currentActionSetting = null;
                         return;
@@ -465,6 +507,7 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
 
                     await moveActionSetting.actionState.Act(ownerModel);
                     moveActionSetting.ConsumeRepeat();
+                    actionsSinceMeteorDrop++;
                 }
                 randomMoveCount = 0;
             }
@@ -496,7 +539,9 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
             if (wendigModelAnger.Presenter is { } presenterBEnd)
                 presenterBEnd.IsAngerAction = false;
             lastMeteorDropTime = Time.time;
+            actionsSinceMeteorDrop = 0;
         }
+        lastActionWasJumpSlash = false;
         currentState = BerserkState.Idle;
     }
 
@@ -607,10 +652,11 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
                 if (randomMoveCount < effectiveMinMelee) continue;
             }
 
-            // MeteorDropクールダウン: 実行後一定時間は抽選対象外.
+            // MeteorDropクールダウン + 行動カウント制限: 実行後一定時間・8回以上他行動を行うまで抽選対象外.
             if (setting.actionState is EnemState_Wendig_MeteorDrop)
             {
                 if (Time.time - lastMeteorDropTime < meteorDropLotteryCooldown) continue;
+                if (actionsSinceMeteorDrop < minActionsBeforeMeteorDrop) continue;
             }
 
             float weight = setting.activationWeight;
@@ -748,6 +794,8 @@ public class EnemAIUpdater_Wendig_Berserk : EnemAIUpdater_Wendig_abstract
             default: await WendigMasterAI.MeleeAttackState.Act(ownerModel); break;
         }
         meleeAttacksSinceLastRush++;
+        actionsSinceMeteorDrop++;
+        lastActionWasJumpSlash = false;
         randomMoveCount = 0;
         return true;
     }

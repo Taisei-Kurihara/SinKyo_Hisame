@@ -316,11 +316,13 @@ namespace InGame.Player.Animation
             if (active)
             {
                 iaiWarningAnimator.gameObject.SetActive(true);
-                iaiWarningAnimator.SetTrigger("Start");
+                // 残留Stopトリガーがあると即消費されるためリセット.
+                iaiWarningAnimator.SetTrigger("Blue");
             }
             else
             {
-                iaiWarningAnimator.SetTrigger("Stop");
+                // 残留Startトリガーがあると即消費されるためリセット.
+                iaiWarningAnimator.ResetTrigger("Blue");
             }
         }
     }

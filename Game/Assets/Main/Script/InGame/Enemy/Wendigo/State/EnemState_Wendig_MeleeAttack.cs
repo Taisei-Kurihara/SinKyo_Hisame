@@ -40,6 +40,13 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
         colliderState.ClearHitTargets();
         colliderState.SetDamage(attackDamage);
 
+        // プレイヤーの方を向く.
+        var player = Object.FindFirstObjectByType<InGame.Player.PlayerScope>();
+        if (player != null)
+        {
+            EnemFacingHelper.FaceToward(enemyModel.Presenter.transform, player.transform.position);
+        }
+
         // 前回のトリガーが残留している場合に備えてリセット.
         enemyModel.Animator.ResetTrigger("Attack_End");
         enemyModel.Animator.ResetTrigger("Attack");
@@ -74,6 +81,9 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
         // Attackアニメーション終了まで当たり判定を維持.
         Vector2 colliderOffset = new Vector2(-Mathf.Abs(attackOffset.x), attackOffset.y);
 
+        // 安全タイムアウト用.
+        float colliderPhaseStartTime = Time.time;
+
         await EnemColliderHelper.ExecuteColliderPhaseUntil(
             enemyModel,
             new EnemColliderHelper.ColliderPhaseConfig
@@ -87,6 +97,8 @@ public class EnemState_Wendig_MeleeAttack : EnemState_abstract
             },
             () =>
             {
+                // 安全タイムアウト（2秒）: アニメーション未完了時の無限待機を防止.
+                if (Time.time - colliderPhaseStartTime > 2f) return true;
                 if (!EnemNullSafetyHelper.IsValidWithAnimator(enemyModel)) return true;
                 var stateInfo = animator.GetCurrentAnimatorStateInfo(0);
                 return !stateInfo.IsName("Attack") || stateInfo.normalizedTime >= 1f;

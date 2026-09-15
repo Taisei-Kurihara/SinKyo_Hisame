@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceLocations;
 using Cysharp.Threading.Tasks;
 
 namespace Audio
@@ -71,6 +72,18 @@ namespace Audio
 
             try
             {
+                // Addressablesにキーが登録されているか事前確認.
+                AsyncOperationHandle<IList<IResourceLocation>> locHandle =
+                    Addressables.LoadResourceLocationsAsync(clipAddress, typeof(AudioClip));
+                IList<IResourceLocation> locations = await locHandle;
+                bool exists = locations != null && locations.Count > 0;
+                Addressables.Release(locHandle);
+
+                if (!exists)
+                {
+                    return;
+                }
+
                 AsyncOperationHandle<AudioClip> handle = Addressables.LoadAssetAsync<AudioClip>(clipAddress);
                 AudioClip clip = await handle;
 
@@ -78,20 +91,18 @@ namespace Audio
                 {
                     clips[clipAddress] = clip;
                     handles[clipAddress] = handle;
-                    Debug.Log($"[SEPlayer] AudioClip '{clipAddress}' を読み込みました.");
                 }
                 else
                 {
-                    Debug.LogWarning($"[SEPlayer] AudioClip '{clipAddress}' の読み込みに失敗しましたが、処理を継続します.");
                     if (handle.IsValid())
                     {
                         Addressables.Release(handle);
                     }
                 }
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                Debug.LogWarning($"[SEPlayer] AudioClip '{clipAddress}' の読み込み中にエラーが発生しましたが、処理を継続します: {e.Message}");
+                // Addressablesキー未登録等のエラーはサイレントスキップ.
             }
         }
 
@@ -118,10 +129,7 @@ namespace Audio
             {
                 audioSource.PlayOneShot(clip, volume);
             }
-            else
-            {
-                Debug.LogWarning($"[SEPlayer] AudioClip '{clipName}' が登録されていません.");
-            }
+            // 未登録のClipはサイレントスキップ.
         }
 
         /// <summary> SEClipRegistryのアクション名でAudioClipを再生. </summary>

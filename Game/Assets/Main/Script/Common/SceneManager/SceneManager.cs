@@ -68,7 +68,7 @@ namespace Common
                     }
 
                     // フェードイン開始
-                    //await StartFadeIn();
+                    await StartFadeIn();
 
                     //ロード
                     _mainScene = Addressables.LoadSceneAsync(mainSceneInfo.SceneName, UnityEngine.SceneManagement.LoadSceneMode.Single);
@@ -255,24 +255,59 @@ namespace Common
         }
 
         LoadScene_interface loadScene;
+        private GameObject _fadeObj;      // フェードオブジェクト参照（シーン間で保持・再利用）.
+        private bool _isPrewarming = false; // PrewarmFadeAsync 実行中フラグ（二重生成防止）.
 
         /// <summary>
-        /// フェードイン処理を開始
+        /// フェードを事前に用意する（タイトル画面での初回遅延防止）.
+        /// Init() から呼ぶ。完了前に StartFadeIn() が呼ばれても安全（通常ロードにフォールバック）.
+        /// </summary>
+        public async UniTask PrewarmFadeAsync()
+        {
+            if (_fadeObj != null || _isPrewarming) return;
+            _isPrewarming = true;
+
+            var fadeHandle = Addressables.InstantiateAsync("CommonFadeCanvas");
+            await fadeHandle.Task;
+            var newFadeObj = fadeHandle.Result;
+
+            // Fade_abstract.Start() が SingletonFadeManager に登録・非表示化するのを待つ.
+            await UniTask.Yield();
+
+            await UIManager.Instance().AttachToCanvas(newFadeObj);
+
+            // 準備完了後にフィールド設定（StartFadeIn との競合を防ぐため最後に代入）.
+            loadScene = newFadeObj.GetComponent<LoadScene_interface>();
+            _fadeObj = newFadeObj;
+            _isPrewarming = false;
+
+            Debug.Log("[SceneManager] フェードプリウォーム完了");
+        }
+
+        /// <summary>
+        /// フェードイン処理を開始.
+        /// プリウォーム済みの場合は再利用、未準備の場合は通常ロード.
         /// </summary>
         private async UniTask StartFadeIn()
         {
-            // フェード用キャンバスを呼び出し
-            var fadeHandle = Addressables.InstantiateAsync("Load");
-            await fadeHandle.Task;
-            var fadeObj = fadeHandle.Result;
-            //fadeObj.transform.SetParent(transform);
+            if (_fadeObj == null)
+            {
+                // プリウォーム未完了 → 通常ロード.
+                var fadeHandle = Addressables.InstantiateAsync("CommonFadeCanvas");
+                await fadeHandle.Task;
+                _fadeObj = fadeHandle.Result;
 
-            // UIManagerのCanvas親子付け関数で親子付け
-            await UIManager.Instance().AttachToCanvas(fadeObj);
+                // Fade_abstract.Start() 実行待機.
+                await UniTask.Yield();
+
+                await UIManager.Instance().AttachToCanvas(_fadeObj);
+                loadScene = _fadeObj.GetComponent<LoadScene_interface>();
+            }
+
+            // SetActive(false) 状態から復帰（Prewarm または前回 StartFadeOut で非表示化済み）.
+            _fadeObj.SetActive(true);
 
             Debug.Log("StartFadeIn");
-
-            loadScene = fadeObj.GetComponent<LoadScene_interface>();
             if (loadScene != null)
             {
                 Debug.Log("LoadScene_interfaceがアタッチされています");
@@ -285,7 +320,8 @@ namespace Common
         }
 
         /// <summary>
-        /// フェードアウト処理を開始
+        /// フェードアウト処理を開始.
+        /// 完了後はオブジェクトを非表示にして保持（次回シーン遷移で再利用）.
         /// </summary>
         private async UniTask StartFadeOut()
         {
@@ -294,6 +330,10 @@ namespace Common
                 UnityEngine.Debug.Log("StartFadeOut");
                 await loadScene.StartFadeOut();
             }
+
+            // 破棄せず非表示にして次回に備える.
+            if (_fadeObj != null)
+                _fadeObj.SetActive(false);
         }
     }
 }

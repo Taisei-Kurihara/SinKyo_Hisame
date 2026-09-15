@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.ResourceManagement.ResourceLocations;
 using Cysharp.Threading.Tasks;
 using Common;
 
@@ -35,29 +36,33 @@ namespace InGame
         {
             if (isInitialized)
             {
-                Debug.Log($"[HitEffectPool] 既に初期化済みのためスキップ.");
                 return;
             }
 
-            Debug.Log($"[HitEffectPool] InitPool開始 - アドレス: '{effectAddress}'");
-
             try
             {
-                Debug.Log($"[HitEffectPool] Addressables読み込み開始 - '{effectAddress}'");
+                // Addressablesにキーが登録されているか事前確認.
+                var locHandle = Addressables.LoadResourceLocationsAsync(effectAddress, typeof(GameObject));
+                IList<IResourceLocation> locations = await locHandle;
+                bool exists = locations != null && locations.Count > 0;
+                Addressables.Release(locHandle);
+
+                if (!exists)
+                {
+                    return;
+                }
+
                 prefabHandle = Addressables.LoadAssetAsync<GameObject>(effectAddress);
                 loadedPrefab = await prefabHandle;
 
                 if (prefabHandle.Status != AsyncOperationStatus.Succeeded || loadedPrefab == null)
                 {
-                    Debug.LogWarning($"[HitEffectPool] エフェクト '{effectAddress}' の読み込みに失敗しました. Status: {prefabHandle.Status}");
                     if (prefabHandle.IsValid())
                     {
                         Addressables.Release(prefabHandle);
                     }
                     return;
                 }
-
-                Debug.Log($"[HitEffectPool] Addressables読み込み成功 - '{effectAddress}', Prefab: {loadedPrefab.name}");
 
                 // プール生成.
                 for (int i = 0; i < PoolSize; i++)
@@ -71,15 +76,13 @@ namespace InGame
                     }
                     obj.SetActive(false);
                     pool.Add(obj);
-                    Debug.Log($"[HitEffectPool] プールオブジェクト生成 [{i + 1}/{PoolSize}] - {obj.name}");
                 }
 
                 isInitialized = true;
-                Debug.Log($"[HitEffectPool] プール初期化完了 - '{effectAddress}' x{PoolSize}");
             }
-            catch (System.Exception e)
+            catch (System.Exception)
             {
-                Debug.LogWarning($"[HitEffectPool] エフェクト '{effectAddress}' の読み込み中にエラー: {e.GetType().Name}: {e.Message}");
+                // Addressablesキー未登録等のエラーはサイレントスキップ.
             }
         }
 
@@ -92,7 +95,6 @@ namespace InGame
         {
             if (!isInitialized)
             {
-                Debug.LogWarning($"[HitEffectPool] Spawn失敗 - プール未初期化.");
                 return;
             }
 
@@ -104,7 +106,6 @@ namespace InGame
                 // プールに空きがなければ追加生成.
                 obj = Instantiate(loadedPrefab, transform);
                 pool.Add(obj);
-                Debug.Log($"[HitEffectPool] プール不足のため追加生成 - 現在プール数: {pool.Count}");
             }
 
             // 2Dゲーム用にZ座標を0に固定.

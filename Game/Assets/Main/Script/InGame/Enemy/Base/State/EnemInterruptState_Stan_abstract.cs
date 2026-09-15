@@ -7,6 +7,13 @@ public abstract class EnemInterruptState_Stan_abstract : EnemInterruptState_abst
     protected string stanBoolName = "Stan";
     protected float stanDuration = 2f;
 
+    /// <summary>
+    /// スタン開始時に InGamePresenter へ通知する戦闘状態.
+    /// 継承クラスのコンストラクタで上書きする
+    /// （長時間スタン系は StunLong、通常は StunShort）.
+    /// </summary>
+    protected EnemyBattleState battleStateOnStan = EnemyBattleState.StunShort;
+
     public EnemInterruptState_Stan_abstract()
     {
         stateType = EnemyState.Damaged;
@@ -23,9 +30,23 @@ public abstract class EnemInterruptState_Stan_abstract : EnemInterruptState_abst
             return;
         }
 
+        // スタン開始：アタッチ中の当たり判定をすべてキャンセル.
+        if (enemyModel.Presenter != null)
+        {
+            var hitDetectors = enemyModel.Presenter.GetComponents<EnemyAttackHitDetector>();
+            foreach (var detector in hitDetectors)
+            {
+                if (detector != null) UnityEngine.Object.Destroy(detector);
+            }
+            Debug.Log($"[EnemInterruptState_Stan_abstract] 当たり判定キャンセル - 検出器数: {hitDetectors.Length}");
+        }
+
         // Stan開始：アニメーションSetBool true.
         enemyModel.Animator.SetBool(stanBoolName, true);
         Debug.Log($"[EnemInterruptState_Stan_abstract] {stanBoolName} = true 設定");
+
+        // InGamePresenter へスタン状態を通知（StunShort or StunLong）.
+        enemyModel.Presenter?.SetBattleState(battleStateOnStan);
 
         // スタン処理（継承クラスでオーバーライド可能）.
         await OnStanProcess(enemyModel);
@@ -36,6 +57,9 @@ public abstract class EnemInterruptState_Stan_abstract : EnemInterruptState_abst
             enemyModel.Animator.SetBool(stanBoolName, false);
             Debug.Log($"[EnemInterruptState_Stan_abstract] {stanBoolName} = false 設定");
         }
+
+        // スタン終了を通知.
+        enemyModel?.Presenter?.SetBattleState(EnemyBattleState.Idle);
 
         Debug.Log($"[EnemInterruptState_Stan_abstract] Act完了");
     }

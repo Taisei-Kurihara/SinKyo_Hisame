@@ -122,6 +122,8 @@ public class EnemState_Wendig_Rush : EnemState_abstract
         if (!EnemNullSafetyHelper.IsValid(enemyModel)) { isAborted = true; return; }
         enemyModel.Presenter.PlayAttackWarning(false);
         enemyModel.Presenter.IsRushing = true;
+        // Rush（非パリィ攻撃）開始を InGamePresenter へ通知.
+        enemyModel.Presenter.SetBattleState(EnemyBattleState.AttackNonParryable);
         await UniTask.Delay((int)(300 / animSpeed));
     }
 
@@ -227,6 +229,8 @@ public class EnemState_Wendig_Rush : EnemState_abstract
 
         // 元の状態を復元（常に実行 — クリーンアップ保証）.
         RestoreState();
+        // Rush 終了を InGamePresenter へ通知.
+        enemyModel?.Presenter?.SetBattleState(EnemyBattleState.Idle);
         await UniTask.CompletedTask;
     }
 

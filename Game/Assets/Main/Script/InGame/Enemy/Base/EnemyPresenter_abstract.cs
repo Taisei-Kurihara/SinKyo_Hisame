@@ -6,8 +6,36 @@ using System.Threading;
 using UnityEngine;
 
 
+/// <summary>
+/// 攻撃の種別タグ.
+/// 回避パリィ時にどのスタン処理を適用するかの判定に使用する.
+/// </summary>
+public enum EnemyAttackTag
+{
+    Normal,    // 通常攻撃（パリィ可能/不可問わず、パリィスタン対象）
+    BigAttack,  // 大技（隕石落下等）: 5secスタン + チャンス状態対象
+}
+
 public abstract class EnemyPresenter_abstract : MonoBehaviour
 {
+    /// <summary>
+    /// 必殺技の軌道中心として使う Transform（Inspector で設定）.
+    /// 未設定の場合は PlayerPresenter がフォールバック値を使用する.
+    /// 敵 GameObject の子オブジェクト（例: 胸部ボーン、専用 Empty）を割り当てること.
+    ///
+    /// ※ X は PlayerPresenter が Collider2D.bounds.center.x（ワールド空間）で自動補正するため,
+    ///   この Transform は Y 高さ調整にのみ使われる.
+    /// </summary>
+    [SerializeField] private Transform chanceAttackOrbitCenter;
+    public Transform ChanceAttackOrbitCenter => chanceAttackOrbitCenter;
+
+    /// <summary>
+    /// 必殺技軌道中心に加算するワールド空間オフセット（Inspector で微調整用）.
+    /// X: 左右のずれ補正、Y: 上下のずれ補正.
+    /// </summary>
+    [SerializeField] private Vector2 chanceAttackOrbitOffset = Vector2.zero;
+    public Vector2 ChanceAttackOrbitOffset => chanceAttackOrbitOffset;
+
     protected Animator animator;
 
     protected EnemyModel_abstract model;
@@ -109,6 +137,57 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
         }
     }
 
+    // ---- Animation Event コールバック（攻撃判定同期用） ----
+    // State側からコールバックを登録し、アニメーションクリップの
+    // AnimEvent_HitStart / AnimEvent_HitEnd イベントで判定開始/終了を通知する.
+    private System.Action onAnimHitStart;
+    private System.Action onAnimHitEnd;
+
+    /// <summary>
+    /// Animation Event: 攻撃ヒット判定の開始タイミング.
+    /// アニメーションクリップのキーフレームから呼ばれる.
+    ///
+    /// 【Unity Editor での設定方法】
+    /// 1. Project ウィンドウで対象のアニメーションクリップ(.anim)を選択
+    ///    例: TripleAttack_0.anim, TripleAttack_1.anim, TripleAttack_2.anim
+    /// 2. Animation ウィンドウを開く（Window > Animation > Animation）
+    /// 3. タイムラインで「攻撃判定を開始したいフレーム」にシークバーを移動
+    ///    （振り始め等、実際に武器が当たり始めるフレーム）
+    /// 4. タイムライン上部の「Add Event」ボタン（▼マーク）をクリック
+    ///    → イベントマーカーが追加される
+    /// 5. Inspector に表示される Function ドロップダウンから
+    ///    「AnimEvent_HitStart」を選択
+    /// 6. 同様に「攻撃判定を終了したいフレーム」に移動し、
+    ///    「AnimEvent_HitEnd」を追加
+    /// 7. 各 TripleAttack_0 / _1 / _2 の3クリップすべてに設定
+    ///
+    /// ※ Animation Event は、Animator が存在する GameObject 上の
+    ///    MonoBehaviour の public メソッドを呼び出す.
+    ///    EnemyPresenter_abstract (MonoBehaviour) が Animator と同じ
+    ///    GameObject にあるため、自動的に呼び出される.
+    /// </summary>
+    public void AnimEvent_HitStart() => onAnimHitStart?.Invoke();
+
+    /// <summary>
+    /// Animation Event: 攻撃ヒット判定の終了タイミング.
+    /// 設定方法は AnimEvent_HitStart と同様.
+    /// </summary>
+    public void AnimEvent_HitEnd() => onAnimHitEnd?.Invoke();
+
+    /// <summary>ヒット判定コールバックを登録.</summary>
+    public void RegisterHitDetectionCallbacks(System.Action onStart, System.Action onEnd)
+    {
+        onAnimHitStart = onStart;
+        onAnimHitEnd = onEnd;
+    }
+
+    /// <summary>コールバックをクリア.</summary>
+    public void ClearHitDetectionCallbacks()
+    {
+        onAnimHitStart = null;
+        onAnimHitEnd = null;
+    }
+
     // ---- 攻撃タイミング公開（回避居合い判定用） ----
     /// <summary>攻撃が間近かどうか（PlayAttackWarning〜攻撃終了の間true）.</summary>
     public bool IsAttackImminent { get; private set; }
@@ -116,6 +195,17 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
     public float AttackWarningTime { get; private set; }
     /// <summary>現在の攻撃がパリィ可能か.</summary>
     public bool IsCurrentAttackParryable { get; private set; }
+    /// <summary>現在の攻撃の種別タグ（回避パリ���処理の分岐に使用）.</summary>
+    public EnemyAttackTag CurrentAttackTag { get; private set; } = EnemyAttackTag.Normal;
+
+    /// <summary>
+    /// 攻撃タグをセットする.
+    /// PlayAttackWarning と同タイミングか直前に呼ぶこと.
+    /// </summary>
+    public void SetAttackTag(EnemyAttackTag tag)
+    {
+        CurrentAttackTag = tag;
+    }
     /// <summary>突進中フラグ（Rush stateからセット）.</summary>
     public bool IsRushing { get; set; }
     /// <summary>怒り時専用行動中フラグ（AIUpdaterからセット）.</summary>
@@ -123,11 +213,26 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
     /// <summary>MeteorDrop（大技）実行中フラグ.</summary>
     public bool IsMeteorDropActive { get; set; }
 
+    // ---- InGamePresenter 連携 ----
+    /// <summary>ゲームプレイ上の戦闘状態（InGamePresenter に通知済みの最新値）.</summary>
+    public EnemyBattleState BattleState { get; private set; } = EnemyBattleState.None;
+
+    /// <summary>
+    /// 戦闘状態を更新し InGamePresenter へ通知する.
+    /// 各 State クラスから呼ぶこと（直接 BattleState を変更しない）.
+    /// </summary>
+    public void SetBattleState(EnemyBattleState state)
+    {
+        BattleState = state;
+        InGamePresenter.Instance.SetEnemyState(state);
+    }
+
     /// <summary>攻撃タイミングフラグをリセット.</summary>
     public void ClearAttackImminent()
     {
         IsAttackImminent = false;
         IsRushing = false;
+        CurrentAttackTag = EnemyAttackTag.Normal;
     }
 
     /// <summary>
@@ -197,6 +302,9 @@ public abstract class EnemyPresenter_abstract : MonoBehaviour
 
         // 画面外インジケーター初期化.
         InitializeOffScreenIndicator().Forget();
+
+        // 必殺技軌道中心 Transform + オフセットを InGamePresenter に登録.
+        InGamePresenter.Instance.SetEnemyOrbitCenter(chanceAttackOrbitCenter, chanceAttackOrbitOffset);
     }
 
     /// <summary>

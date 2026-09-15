@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using System.Threading;
 using Audio;
 using Common;
 using Cysharp.Threading.Tasks;
+using InGame.Common;
 using InGame.Enemy;
 using SceneInfo;
 using UnityEngine;
@@ -11,16 +13,19 @@ using UnityEngine.Video;
 
 namespace SceneEventer
 {
-    public class TitleEventer : ButtonEventer
+    public class TitleEventer : MenuButtonEventer
     {
+        // ============================
+        // === 変数 ===
+        // ============================
+
+        /// <summary>
+        /// Inspector で設定するボタン列配列（2次元配列の列ラッパー）.
+        /// buttons[x][y]: x=横ナビ列, y=縦ナビ行.
+        /// 例: Column0=[チュートリアル, スタート, 終了], Column1=[言語切替]
+        /// </summary>
         [SerializeField]
-        private Button gameStart;
-        [SerializeField]
-        private Button newGame;
-        [SerializeField]
-        private Button setting;
-        [SerializeField]
-        private Button QuitGame;
+        private MenuButtonRow[] buttonRows;
 
         [SerializeField]
         private VideoPlayer videoPlayer;
@@ -39,34 +44,70 @@ namespace SceneEventer
         private bool isInputMonitoring = false;
         private bool inputDetected = false;
 
-        //ここで全ての処理のボタン押したらっていう処理を書く
-        protected override void ButtonEvents(Button button)
+        // タイトルSE.
+        private SEPlayer titleSEPlayer;
+
+        // ボタンラベル辞書（MenuButtonIndex → { JP文字列, EN文字列 }）.
+        // タイトル画面では全言語のデータを常時メモリに保持し、言語切り替えを即時反映する.
+        private static readonly Dictionary<MenuButtonIndex, string[]> buttonLabelMap =
+            new Dictionary<MenuButtonIndex, string[]>
         {
-            switch (button)
-            {
-                case var _ when button == gameStart:
-                    GameStart();
-                    break;
-                case var _ when button == newGame:
-                    TutorialStart();
-                    break;
-                case var _ when button == setting:
-                    break;
-                case var _ when button == QuitGame:
-                    Quit();
-                    break;
-            }
-        }
+            { MenuButtonIndex.TitleTutorial,  new[] { "修練所",  "Tutorial"  } },
+            { MenuButtonIndex.TitleGameStart, new[] { "討伐",    "Game Start" } },
+            { MenuButtonIndex.TitleGameQuit,  new[] { "終了",    "Quit"       } },
+            { MenuButtonIndex.Language,       new[] { "(日)/ EN", "日 /(EN)"  } },
+        };
+
+        // ラベルキャッシュ: (TextMeshProUGUI, string[JP,EN]) のフラットリスト.
+        // InitMenuButtonLabel() 完了後に OnLanguageChanged 初回呼び出しで構築される.
+        private List<(TMPro.TextMeshProUGUI label, string[] texts)> _labelCache;
+
+        // buttonsSlot 実装（abstract 強制）.
+        private ButtonSlotDictionary _buttonsSlot;
+        protected override ButtonSlotDictionary buttonsSlot => _buttonsSlot;
+
+        [Header("ミッション設定")]
+        [Tooltip("難易度")]
+        [SerializeField] private MissionTag difficulty = MissionTag.Difficulty_Normal;
+
+        [Tooltip("条件")]
+        [SerializeField] private MissionTag condition = MissionTag.Condition_BossNormal;
+
+        [Tooltip("Enemy名")]
+        [SerializeField] private MissionTag enemyName = MissionTag.Enemy_Wendigo;
+
+        public const string MissionTagsPrefsKey = "MissionTags";
+
+        /// <summary>選択中のミッションタグ（全カテゴリ合成）.</summary>
+        public MissionTag SelectedTags => difficulty | condition | enemyName;
+
+        // ============================
+        // === 初期化するための関数 ===
+        // ============================
 
         protected override void Init()
         {
-            buttons = new Button[][]
+            // スロット定義: { MenuButtonIndex, 一意のslotID, 発火アクション }
+            _buttonsSlot = new ButtonSlotDictionary()
             {
-                    new Button[]{gameStart},
-                    new Button[]{newGame},
-                    //new Button[]{setting},
-                    new Button[]{QuitGame}
+                { MenuButtonIndex.TitleTutorial,  0, TutorialStart,  ButtonFireMode.EarlyFire },
+                { MenuButtonIndex.TitleGameStart, 1, GameStart,      ButtonFireMode.EarlyFire },
+                { MenuButtonIndex.TitleGameQuit,  2, Quit,           ButtonFireMode.EarlyFire },
+                { MenuButtonIndex.Language,       3, ToggleLanguage, ButtonFireMode.Immediate },
             };
+
+            // Inspector の buttonRows から buttons 2次元配列を構築.
+            // 未設定（Inspector設定待ち）の場合は空配列で初期化してクラッシュを防ぐ.
+            if (buttonRows != null && buttonRows.Length > 0)
+            {
+                buttons = new MenuButton[buttonRows.Length][];
+                for (int i = 0; i < buttonRows.Length; i++)
+                    buttons[i] = buttonRows[i]?.buttons ?? new MenuButton[0];
+            }
+            else
+            {
+                buttons = new MenuButton[0][];
+            }
 
             if (!isVideoPlay)
             {
@@ -75,8 +116,10 @@ namespace SceneEventer
             }
         }
 
-        // タイトルSE.
-        private SEPlayer titleSEPlayer;
+        private void ToggleLanguage()
+        {
+            Common.LanguageManager.Instance()?.ToggleLanguage();
+        }
 
         private void Start()
         {
@@ -86,6 +129,35 @@ namespace SceneEventer
 
             // SE初期化（SEファイルが存在しなくてもエラーにならない）.
             InitializeTitleSE().Forget();
+
+            // 起動時に現在の言語でラベルを適用.
+            var lang = Common.LanguageManager.Instance(false)?.CurrentLanguage ?? GameLanguage.Japanese;
+            OnLanguageChanged(lang);
+        }
+
+        protected override void OnLanguageChanged(GameLanguage lang)
+        {
+            if (buttons == null) return;
+
+            // 初回呼び出し時にキャッシュを構築（Awake の InitMenuButtonLabel() 完了後に実行される）.
+            if (_labelCache == null)
+            {
+                _labelCache = new List<(TMPro.TextMeshProUGUI, string[])>();
+                foreach (var col in buttons)
+                {
+                    if (col == null) continue;
+                    foreach (var mb in col)
+                    {
+                        if (mb == null || mb.labelText == null) continue;
+                        if (buttonLabelMap.TryGetValue(mb.index, out var texts))
+                            _labelCache.Add((mb.labelText, texts));
+                    }
+                }
+            }
+
+            int li = lang == GameLanguage.English ? 1 : 0;
+            foreach (var (label, texts) in _labelCache)
+                label.text = texts[li];
         }
 
         private async UniTaskVoid InitializeTitleSE()
@@ -94,15 +166,74 @@ namespace SceneEventer
             await titleSEPlayer.LoadClipsAsync("SE_Title_Select", "SE_Title_Submit");
         }
 
-        protected override void OnButtonSelected(UnityEngine.UI.Button button)
+        protected override void OnButtonSelected(MenuButton button)
         {
             titleSEPlayer?.Play("SE_Title_Select");
         }
 
-        protected override void OnButtonSubmitted(UnityEngine.UI.Button button)
+        protected override void OnButtonSubmitted(MenuButton button)
         {
             titleSEPlayer?.Play("SE_Title_Submit");
+            // Language は buttonsSlot に Immediate で登録済みのため、ここでは処理しない.
         }
+
+        public void GameStart()
+        {
+            // チュートリアルモード解除（残留防止）.
+            PlayerPrefs.SetInt("TutorialMode", 0);
+
+            // Enemy名 → EnemyName enumへの変換.
+            EnemyName enemy = MissionTagToEnemyName(enemyName);
+            PlayerPrefs.SetInt("EnemyName", (int)enemy);
+
+            // MissionTags（難易度+条件+Enemy名の合成）を保存.
+            PlayerPrefs.SetInt(MissionTagsPrefsKey, (int)SelectedTags);
+            PlayerPrefs.Save();
+
+            Debug.Log($"[StageSelect] 難易度:{difficulty} 条件:{condition} Enemy:{enemyName} → Tags:{SelectedTags} ({(int)SelectedTags})");
+
+            // MainSceneInfo で敵生成を含むシーンをロード.
+            SceneManager.Instance().LoadMainScene(new MainSceneInfo()).Forget();
+        }
+
+        public void TutorialStart()
+        {
+            // チュートリアルモード PlayerPrefs 設定.
+            PlayerPrefs.SetInt("TutorialMode", 1);
+            PlayerPrefs.Save();
+
+            SceneManager.Instance().LoadMainScene(new TutorialInfo()).Forget();
+        }
+
+        public void NewGame()
+        {
+            SceneManager.Instance().LoadMainScene(new StageSelectInfo()).Forget();
+        }
+
+        /// <summary>
+        /// MissionTag(Enemy_*) → EnemyName enum変換.
+        /// </summary>
+        private static EnemyName MissionTagToEnemyName(MissionTag tag)
+        {
+            if ((tag & MissionTag.Enemy_Wendigo) != 0) return EnemyName.Wendigo;
+            return EnemyName.None;
+        }
+
+        /// <summary>
+        /// Game終了処理。
+        /// </summary>
+        public void Quit()
+        {
+            #if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+            #else
+            Application.Quit();
+            #endif
+        }
+
+        // ============================
+        // === 更新処理 ===
+        // ============================
 
         private void LateUpdate()
         {
@@ -118,36 +249,9 @@ namespace SceneEventer
             }
         }
 
-        /// <summary>
-        /// 入力監視を開始.
-        /// </summary>
-        public void StartInputMonitoring()
-        {
-            isInputMonitoring = true;
-            inputDetected = false;
-        }
-
-        /// <summary>
-        /// 入力監視を停止.
-        /// </summary>
-        public void StopInputMonitoring()
-        {
-            isInputMonitoring = false;
-            inputDetected = false;
-        }
-
-        /// <summary>
-        /// 入力検出フラグを消費して返す.
-        /// </summary>
-        public bool ConsumeInputDetected()
-        {
-            if (inputDetected)
-            {
-                inputDetected = false;
-                return true;
-            }
-            return false;
-        }
+        // ============================
+        // === 更新処理が使用する関数 ===
+        // ============================
 
         /// <summary>
         /// ビデオ再生開始.
@@ -202,6 +306,39 @@ namespace SceneEventer
             videoPlayer.gameObject.SetActive(false);
         }
 
+        // --- input があった時の関数 ---
+
+        /// <summary>
+        /// 入力監視を開始.
+        /// </summary>
+        public void StartInputMonitoring()
+        {
+            isInputMonitoring = true;
+            inputDetected = false;
+        }
+
+        /// <summary>
+        /// 入力監視を停止.
+        /// </summary>
+        public void StopInputMonitoring()
+        {
+            isInputMonitoring = false;
+            inputDetected = false;
+        }
+
+        /// <summary>
+        /// 入力検出フラグを消費して返す.
+        /// </summary>
+        public bool ConsumeInputDetected()
+        {
+            if (inputDetected)
+            {
+                inputDetected = false;
+                return true;
+            }
+            return false;
+        }
+
         /// <summary>
         /// 何かしらの入力があるか判定.
         /// </summary>
@@ -224,76 +361,6 @@ namespace SceneEventer
             if (action.UI.Cancel.IsPressed()) return true;
             return false;
         }
-
-        [Header("ミッション設定")]
-        [Tooltip("難易度")]
-        [SerializeField] private MissionTag difficulty = MissionTag.Difficulty_Normal;
-
-        [Tooltip("条件")]
-        [SerializeField] private MissionTag condition = MissionTag.Condition_BossNormal;
-
-        [Tooltip("Enemy名")]
-        [SerializeField] private MissionTag enemyName = MissionTag.Enemy_Wendigo;
-
-        public const string MissionTagsPrefsKey = "MissionTags";
-
-        /// <summary>選択中のミッションタグ（全カテゴリ合成）.</summary>
-        public MissionTag SelectedTags => difficulty | condition | enemyName;
-
-        public void GameStart()
-        {
-            // チュートリアルモード解除（残留防止）.
-            PlayerPrefs.SetInt("TutorialMode", 0);
-
-            // Enemy名 → EnemyName enumへの変換.
-            EnemyName enemy = MissionTagToEnemyName(enemyName);
-            PlayerPrefs.SetInt("EnemyName", (int)enemy);
-
-            // MissionTags（難易度+条件+Enemy名の合成）を保存.
-            PlayerPrefs.SetInt(MissionTagsPrefsKey, (int)SelectedTags);
-            PlayerPrefs.Save();
-
-            Debug.Log($"[StageSelect] 難易度:{difficulty} 条件:{condition} Enemy:{enemyName} → Tags:{SelectedTags} ({(int)SelectedTags})");
-
-            // MainSceneInfo で敵生成を含むシーンをロード.
-            SceneManager.Instance().LoadMainScene(new MainSceneInfo()).Forget();
-        }
-
-        public void TutorialStart()
-        {
-            // チュートリアルモード PlayerPrefs 設定.
-            PlayerPrefs.SetInt("TutorialMode", 1);
-            PlayerPrefs.Save();
-
-            SceneManager.Instance().LoadMainScene(new TutorialInfo()).Forget();
-        }
-
-        public void NewGame()
-        {
-            SceneManager.Instance().LoadMainScene(new StageSelectInfo()).Forget();
-        }
-
-        /// <summary>
-        /// MissionTag(Enemy_*) → EnemyName enum変換.
-        /// </summary>
-        private static EnemyName MissionTagToEnemyName(MissionTag tag)
-        {
-            if ((tag & MissionTag.Enemy_Wendigo) != 0) return EnemyName.Wendigo;
-            return EnemyName.None;
-        }
-
-        /// <summary>
-        /// Game終了処理。
-        /// </summary>
-        public void Quit()
-        {
-            #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-            #else
-                Application.Quit();
-            #endif
-        }
-
     }
 
     public interface IStateAnimeloop
@@ -314,7 +381,6 @@ namespace SceneEventer
 
         public void OnEnter(TitleEventer eventer)
         {
-            Debug.Log("[stateAnimeloop] OnEnter - ビデオ再生開始");
             // UI操作を停止.
             eventer.DisableEventer();
             // ビデオ再生開始.
@@ -328,7 +394,6 @@ namespace SceneEventer
             // 入力監視で検出された入力を消費して遷移判定.
             if (eventer.ConsumeInputDetected())
             {
-                Debug.Log("[stateAnimeloop] 入力検出 → stateAnimeloopStopへ遷移");
                 eventer.StopInputMonitoring();
                 var next = new stateAnimeloopStop();
                 next.OnEnter(eventer);
@@ -346,9 +411,9 @@ namespace SceneEventer
 
         public void OnEnter(TitleEventer eventer)
         {
-            Debug.Log("[stateAnimeloopStop] OnEnter - ビデオ停止");
-            // UI操作を有効化.
+            // UI操作を有効化 + ボタン色を暗い状態にリセットしてカーソルを先頭へ.
             eventer.EnableEventer();
+            eventer.ResetSelection();
             // ビデオ停止.
             eventer.StopVideo();
             idleTimer = 0f;

@@ -10,12 +10,16 @@ namespace InGame.Common
     /// ゲームオーバー画面のボタン/表示管理.
     /// ButtonEventerを継承し、Inspectorで設定した子Objを管理する.
     /// </summary>
-    public class GameOverEventer : ButtonEventer
+    public class GameOverEventer : MenuButtonEventer
     {
         // Inspectorで設定する子Obj.
         [SerializeField] private GameObject winObj;
         [SerializeField] private GameObject loseObj;
         [SerializeField] private Button returnTitleButton;
+
+        // buttonsSlot 実装（abstract 強制）.
+        private ButtonSlotDictionary _buttonsSlot;
+        protected override ButtonSlotDictionary buttonsSlot => _buttonsSlot;
 
         protected override void Init()
         {
@@ -24,25 +28,22 @@ namespace InGame.Common
             if (loseObj != null) loseObj.SetActive(false);
             if (returnTitleButton != null) returnTitleButton.gameObject.SetActive(false);
 
+            _buttonsSlot = new ButtonSlotDictionary()
+            {
+                { (MenuButtonIndex)0, 0, ReturnToTitle },
+            };
+
             // ボタン配列登録.
             if (returnTitleButton != null)
             {
-                buttons = new Button[][]
+                buttons = new MenuButton[][]
                 {
-                    new Button[] { returnTitleButton }
+                    new MenuButton[]{ new MenuButton{ button = returnTitleButton, index = (MenuButtonIndex)0 } }
                 };
             }
             else
             {
                 Debug.LogWarning("[GameOverEventer] ReturnTitleボタンが見つかりません.");
-            }
-        }
-
-        protected override void ButtonEvents(Button button)
-        {
-            if (button == returnTitleButton)
-            {
-                ReturnToTitle();
             }
         }
 
