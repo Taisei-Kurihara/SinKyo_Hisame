@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -114,6 +115,81 @@ namespace Common
                 halfDuration,
                 token
             );
+        }
+
+        // ============================
+        // === TextMeshProUGUI Blink ===
+        // ============================
+
+        /// <summary>
+        /// TextMeshProUGUI.color を 2色間で往復ループ（キャンセルまで継続）.
+        /// </summary>
+        public static async UniTaskVoid BlinkLoopAsync(TextMeshProUGUI text, Color a, Color b, float halfDuration, CancellationToken token)
+        {
+            try
+            {
+                text.color = a;
+                while (!token.IsCancellationRequested)
+                {
+                    await LerpTextAsync(text, a, b, halfDuration, token);
+                    await LerpTextAsync(text, b, a, halfDuration, token);
+                }
+            }
+            catch (OperationCanceledException) { }
+        }
+
+        private static async UniTask LerpTextAsync(TextMeshProUGUI text, Color from, Color to, float duration, CancellationToken token)
+        {
+            float startTime = Time.realtimeSinceStartup;
+            while (true)
+            {
+                token.ThrowIfCancellationRequested();
+                float elapsed = Time.realtimeSinceStartup - startTime;
+                if (elapsed >= duration) { text.color = to; return; }
+                text.color = Color.Lerp(from, to, elapsed / duration);
+                await UniTask.Yield(token);
+            }
+        }
+
+        // ============================
+        // === TextMeshProUGUI Alpha Blink ===
+        // ============================
+
+        /// <summary>
+        /// TextMeshProUGUI の alpha 値を alphaA ↔ alphaB で往復ループ（RGB は変更しない）.
+        /// </summary>
+        public static async UniTaskVoid BlinkAlphaLoopAsync(TextMeshProUGUI text, float alphaA, float alphaB, float halfDuration, CancellationToken token)
+        {
+            try
+            {
+                SetTextAlpha(text, alphaA);
+                while (!token.IsCancellationRequested)
+                {
+                    await LerpTextAlphaAsync(text, alphaA, alphaB, halfDuration, token);
+                    await LerpTextAlphaAsync(text, alphaB, alphaA, halfDuration, token);
+                }
+            }
+            catch (OperationCanceledException) { }
+        }
+
+        private static async UniTask LerpTextAlphaAsync(TextMeshProUGUI text, float fromAlpha, float toAlpha, float duration, CancellationToken token)
+        {
+            float startTime = Time.realtimeSinceStartup;
+            while (true)
+            {
+                token.ThrowIfCancellationRequested();
+                float elapsed = Time.realtimeSinceStartup - startTime;
+                if (elapsed >= duration) { SetTextAlpha(text, toAlpha); return; }
+                SetTextAlpha(text, Mathf.Lerp(fromAlpha, toAlpha, elapsed / duration));
+                await UniTask.Yield(token);
+            }
+        }
+
+        private static void SetTextAlpha(TextMeshProUGUI text, float alpha)
+        {
+            var c = text.color;
+            c.a = alpha;
+            text.color = c;
         }
     }
 }

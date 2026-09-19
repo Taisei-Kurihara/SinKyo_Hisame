@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
@@ -18,12 +19,16 @@ namespace InGame.Player
     ///   ・ピボット: 下中央 (0.5, 0).
     ///   ・PPU は任意（スクリプトが自動でスケール計算する）.
     ///   ・未登録の場合は 1×1 白ピクセルスプライトでフォールバック.
+    ///
+    /// 初期化: ゲーム開始時に InitializePoolAsync() を呼ぶこと.
+    /// これによりスプライトをロード済みのインスタンスをプールに積んでおき、
+    /// Spawn 時の非同期ロードラグ（豆腐表示）を完全に除去する.
     /// </summary>
     public class ChanceAttackSlashEffect : MonoBehaviour
     {
         [SerializeField] private SpriteRenderer spriteRenderer;
 
-        /// <summary>スプライト1ユニットあたりの自然サイズ（高さ）.ロード後に自動設定.</summary>
+        /// <summary>スプライト1ユニットあたりの自然サイズ（高さ）.</summary>
         [SerializeField] private float spriteNaturalHeight = 1f;
 
         /// <summary>Xスケールの最大値（スラッシュの幅）.</summary>
@@ -33,8 +38,7 @@ namespace InGame.Player
         [SerializeField] private float duration = 0.25f;
 
         // ==========================================
-        // Addressables スプライトキャッシュ（静的: 初回ロード後は保持）.
-        //   Addressables キー: "ChanceAttackSlash"
+        // Addressables スプライトキャッシュ
         // ==========================================
 
         /// <summary>Addressables に登録するスプライトのキー名.</summary>
@@ -43,74 +47,117 @@ namespace InGame.Player
         private static Sprite _cachedSprite;
         private static AsyncOperationHandle<Sprite> _spriteHandle;
 
-        // 複数インスタンスが同時に Spawn されても1回しかロードしないための同期源.
-        private static UniTaskCompletionSource<Sprite> _loadSource;
-
         // ロード失敗 / 未登録時のフォールバック（1×1 白ピクセル）.
         private static Sprite _fallbackSprite;
 
         // ==========================================
+        // オブジェクトプール
+        // ==========================================
+
+        private static readonly Queue<ChanceAttackSlashEffect> _pool = new Queue<ChanceAttackSlashEffect>();
 
         /// <summary>
-        /// 静的ファクトリ: 位置・方向・長さを指定してエフェクトを生成する（静的・瞬間表示）.
+        /// スプライトをロードしてプールにインスタンスを積む.
+        /// ゲーム開始時に一度だけ呼ぶこと. 以後の Spawn はプールから取得するため
+        /// 非同期ロードラグが発生しない.
+        /// </summary>
+        public static async UniTaskVoid InitializePoolAsync(int poolSize = 12)
+        {
+            // スプライトを先にロード.
+            Sprite sprite = await LoadSpriteOnceAsync();
+
+            // プールにインスタンスを積む.
+            for (int i = 0; i < poolSize; i++)
+            {
+                var instance = CreatePooledInstance(sprite);
+                instance.gameObject.SetActive(false);
+                _pool.Enqueue(instance);
+            }
+        }
+
+        /// <summary>
+        /// 静的ファクトリ: 位置・方向・長さを指定してエフェクトを生成する.
         /// </summary>
         public static void Spawn(Vector3 from, Vector3 to)
         {
-            var go = new GameObject("ChanceSlashEffect");
-            var effect = go.AddComponent<ChanceAttackSlashEffect>();
-
-            var sr = go.AddComponent<SpriteRenderer>();
-            effect.spriteRenderer = sr;
-            sr.sortingLayerName = "Default";
-            sr.sortingOrder = 10;
-
+            var effect = GetFromPool();
+            effect.gameObject.SetActive(true);
             effect.PlayAsync(from, to).Forget();
         }
 
         /// <summary>
         /// 静的ファクトリ: 開始地点を固定し、<paramref name="trackTarget"/> を毎フレーム追跡して伸びるエフェクトを生成.
-        /// LitMotion 移動中に呼び出し、プレイヤーが動くにつれてスラッシュが延びていく.
         /// </summary>
-        /// <param name="from">スラッシュの起点（開始位置）.</param>
-        /// <param name="trackTarget">追跡するトランスフォーム（プレイヤー）.</param>
-        /// <param name="duration">エフェクトの総表示時間（移動時間に合わせること）.</param>
         public static void SpawnTracking(Vector3 from, Transform trackTarget, float duration)
         {
-            var go = new GameObject("ChanceSlashEffect");
-            var effect = go.AddComponent<ChanceAttackSlashEffect>();
-
-            var sr = go.AddComponent<SpriteRenderer>();
-            effect.spriteRenderer = sr;
-            sr.sortingLayerName = "Default";
-            sr.sortingOrder = 10;
-
+            var effect = GetFromPool();
+            effect.gameObject.SetActive(true);
             effect.duration = duration;
             effect.PlayTrackingAsync(from, trackTarget).Forget();
         }
 
+        // ==========================================
+        // プール管理
+        // ==========================================
+
+        private static ChanceAttackSlashEffect GetFromPool()
+        {
+            // 破棄済みインスタンスを除外しながらプールから取得.
+            while (_pool.Count > 0)
+            {
+                var candidate = _pool.Dequeue();
+                if (candidate != null)
+                    return candidate;
+            }
+
+            // プールが枯渇した場合は新規作成（スプライトは既にキャッシュ済み）.
+            return CreatePooledInstance(_cachedSprite ?? GetFallbackSprite());
+        }
+
+        private static ChanceAttackSlashEffect CreatePooledInstance(Sprite sprite)
+        {
+            var go = new GameObject("ChanceSlashEffect");
+            DontDestroyOnLoad(go);
+
+            var effect = go.AddComponent<ChanceAttackSlashEffect>();
+            var sr = go.AddComponent<SpriteRenderer>();
+            effect.spriteRenderer = sr;
+            sr.sortingLayerName = "Default";
+            sr.sortingOrder = 10;
+            sr.color = new Color(1f, 1f, 1f, 0.85f);
+
+            // スプライトをここで設定: Spawn 時に非同期ロード不要.
+            sr.sprite = sprite;
+            if (sprite != null && sprite.pixelsPerUnit > 0f)
+                effect.spriteNaturalHeight = sprite.rect.height / sprite.pixelsPerUnit;
+
+            // 初期スケールをゼロに: SetActive(true) 直後に旧スケールで描画されるのを防ぐ.
+            go.transform.localScale = Vector3.zero;
+
+            return effect;
+        }
+
+        private void ReturnToPool()
+        {
+            if (this == null) return;
+            transform.localScale = Vector3.zero; // 次回取得時に旧スケールで描画されるのを防ぐ.
+            gameObject.SetActive(false);
+            _pool.Enqueue(this);
+        }
+
+        // ==========================================
+        // アニメーション
+        // ==========================================
+
         private async UniTaskVoid PlayAsync(Vector3 from, Vector3 to)
         {
-            if (spriteRenderer == null) { Destroy(gameObject); return; }
-
-            // --- Addressables からスプライトをロード（初回のみ; 以降はキャッシュを返す）---
-            Sprite sprite = await GetOrLoadSpriteAsync();
-
-            // ロード中に GameObject が破棄された場合は中断.
-            if (this == null || spriteRenderer == null) return;
-
-            spriteRenderer.sprite = sprite;
-            spriteRenderer.color  = new Color(1f, 1f, 1f, 0.85f);
-
-            // スプライトの実サイズからスケール計算基準を設定（PPU に依らず正確な高さを使用）.
-            if (sprite != null && sprite.pixelsPerUnit > 0f)
-                spriteNaturalHeight = sprite.rect.height / sprite.pixelsPerUnit;
+            if (spriteRenderer == null) { ReturnToPool(); return; }
 
             // --- 位置・回転 ---
-            // 開始地点に置き、ローカルY方向が from→to を向くよう回転.
             transform.position = from;
             Vector3 delta  = to - from;
             float distance = delta.magnitude;
-            if (distance < 0.01f) { Destroy(gameObject); return; }
+            if (distance < 0.01f) { ReturnToPool(); return; }
 
             float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg - 90f;
             transform.rotation = Quaternion.Euler(0f, 0f, angle);
@@ -137,7 +184,7 @@ namespace InGame.Player
             }
             catch (OperationCanceledException) { }
 
-            Destroy(gameObject);
+            ReturnToPool();
         }
 
         /// <summary>
@@ -146,19 +193,12 @@ namespace InGame.Player
         /// </summary>
         private async UniTaskVoid PlayTrackingAsync(Vector3 from, Transform trackTarget)
         {
-            if (spriteRenderer == null) { Destroy(gameObject); return; }
-
-            Sprite sprite = await GetOrLoadSpriteAsync();
-            if (this == null || spriteRenderer == null) return;
-
-            spriteRenderer.sprite = sprite;
-            spriteRenderer.color  = new Color(1f, 1f, 1f, 0.85f);
-
-            if (sprite != null && sprite.pixelsPerUnit > 0f)
-                spriteNaturalHeight = sprite.rect.height / sprite.pixelsPerUnit;
+            if (spriteRenderer == null) { ReturnToPool(); return; }
 
             // 起点に配置（毎フレーム to 側だけ更新するため position は固定）.
             transform.position = from;
+            // ループ内で distance <= 0.01 の場合はスケールが更新されないため、ここで明示的にゼロ化.
+            transform.localScale = Vector3.zero;
 
             var token   = this.GetCancellationTokenOnDestroy();
             float elapsed = 0f;
@@ -191,31 +231,17 @@ namespace InGame.Player
             }
             catch (OperationCanceledException) { }
 
-            Destroy(gameObject);
+            ReturnToPool();
         }
 
-        /// <summary>
-        /// キャッシュ済みスプライトを返す。未ロードなら Addressables からロードして返す.
-        /// 複数インスタンスが同時に呼んでもロードは1回のみ.
-        /// </summary>
-        private static async UniTask<Sprite> GetOrLoadSpriteAsync()
+        // ==========================================
+        // スプライトロード（初期化時のみ使用）
+        // ==========================================
+
+        private static async UniTask<Sprite> LoadSpriteOnceAsync()
         {
-            // キャッシュ済みならすぐ返す.
             if (_cachedSprite != null) return _cachedSprite;
 
-            // 初回 → ロード開始.
-            if (_loadSource == null)
-            {
-                _loadSource = new UniTaskCompletionSource<Sprite>();
-                LoadSpriteAsync(_loadSource).Forget();
-            }
-
-            // 2回目以降は同じ Task を await（完了済みなら即返る）.
-            return await _loadSource.Task;
-        }
-
-        private static async UniTaskVoid LoadSpriteAsync(UniTaskCompletionSource<Sprite> source)
-        {
             try
             {
                 _spriteHandle = Addressables.LoadAssetAsync<Sprite>(SpriteAddress);
@@ -224,8 +250,7 @@ namespace InGame.Player
                 if (_spriteHandle.Status == AsyncOperationStatus.Succeeded && result != null)
                 {
                     _cachedSprite = result;
-                    source.TrySetResult(result);
-                    return;
+                    return result;
                 }
 
                 if (_spriteHandle.IsValid()) Addressables.Release(_spriteHandle);
@@ -235,10 +260,10 @@ namespace InGame.Player
                 Debug.LogWarning($"[ChanceAttackSlashEffect] '{SpriteAddress}' ロード失敗: {e.Message}");
             }
 
-            // フォールバック（Addressables に未登録 / ロード失敗）.
+            // フォールバック.
             Sprite fb = GetFallbackSprite();
             _cachedSprite = fb;
-            source.TrySetResult(fb);
+            return fb;
         }
 
         private static Sprite GetFallbackSprite()

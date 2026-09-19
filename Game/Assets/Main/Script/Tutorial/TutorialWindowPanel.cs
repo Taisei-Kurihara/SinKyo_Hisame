@@ -59,7 +59,7 @@ namespace Tutorial
             if (titleText != null)
                 titleText.text = content.Title;
             if (descriptionText != null)
-                descriptionText.text = content.Description;
+                descriptionText.text = TutorialPSNotation.Filter(content.Description);
 
             await LoadVideoAsync(content.VideoAddress);
         }

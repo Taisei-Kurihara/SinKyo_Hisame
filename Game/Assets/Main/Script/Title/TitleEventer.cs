@@ -27,6 +27,9 @@ namespace SceneEventer
         [SerializeField]
         private MenuButtonRow[] buttonRows;
 
+        [Header("タイトルアニメーション")]
+        [SerializeField] private Animator Hisame;
+
         [SerializeField]
         private VideoPlayer videoPlayer;
         [SerializeField]
@@ -44,6 +47,9 @@ namespace SceneEventer
         private bool isInputMonitoring = false;
         private bool inputDetected = false;
 
+        // ビデオ自然終了フラグ.
+        private bool videoFinished = false;
+
         // タイトルSE.
         private SEPlayer titleSEPlayer;
 
@@ -52,10 +58,11 @@ namespace SceneEventer
         private static readonly Dictionary<MenuButtonIndex, string[]> buttonLabelMap =
             new Dictionary<MenuButtonIndex, string[]>
         {
-            { MenuButtonIndex.TitleTutorial,  new[] { "修練所",  "Tutorial"  } },
-            { MenuButtonIndex.TitleGameStart, new[] { "討伐",    "Game Start" } },
-            { MenuButtonIndex.TitleGameQuit,  new[] { "終了",    "Quit"       } },
-            { MenuButtonIndex.Language,       new[] { "(日)/ EN", "日 /(EN)"  } },
+            { MenuButtonIndex.TitleTutorial,        new[] { "修練所",      "Tutorial"          } },
+            { MenuButtonIndex.TitleGameStartNormal, new[] { "討伐",        "Game Start"        } },
+            { MenuButtonIndex.TitleGameStartEasy,   new[] { "瞑想",        "Game Start (Easy)" } },
+            { MenuButtonIndex.TitleGameQuit,        new[] { "終了",        "Quit"              } },
+            { MenuButtonIndex.Language,             new[] { "(日)/ EN",    "日 /(EN)"          } },
         };
 
         // ラベルキャッシュ: (TextMeshProUGUI, string[JP,EN]) のフラットリスト.
@@ -87,13 +94,17 @@ namespace SceneEventer
 
         protected override void Init()
         {
+            // タイトル画面はテキストスライドアニメーションを使用.
+            animatorType = MenuButtonAnimatorType.TextSlide;
+
             // スロット定義: { MenuButtonIndex, 一意のslotID, 発火アクション }
             _buttonsSlot = new ButtonSlotDictionary()
             {
-                { MenuButtonIndex.TitleTutorial,  0, TutorialStart,  ButtonFireMode.EarlyFire },
-                { MenuButtonIndex.TitleGameStart, 1, GameStart,      ButtonFireMode.EarlyFire },
-                { MenuButtonIndex.TitleGameQuit,  2, Quit,           ButtonFireMode.EarlyFire },
-                { MenuButtonIndex.Language,       3, ToggleLanguage, ButtonFireMode.Immediate },
+                { MenuButtonIndex.TitleTutorial,        0, TutorialStart,  ButtonFireMode.EarlyFire },
+                { MenuButtonIndex.TitleGameStartNormal, 1, GameStart,      ButtonFireMode.EarlyFire },
+                { MenuButtonIndex.TitleGameStartEasy,   2, GameStartEasy,  ButtonFireMode.EarlyFire },
+                { MenuButtonIndex.TitleGameQuit,        3, Quit,           ButtonFireMode.EarlyFire },
+                { MenuButtonIndex.Language,             4, ToggleLanguage, ButtonFireMode.Immediate },
             };
 
             // Inspector の buttonRows から buttons 2次元配列を構築.
@@ -123,6 +134,13 @@ namespace SceneEventer
 
         private void Start()
         {
+            // Hisame: 時間停止中でも再生できるよう UnscaledTime に設定 + タイトル開幕アニメーション発火.
+            if (Hisame != null)
+            {
+                Hisame.updateMode = AnimatorUpdateMode.UnscaledTime;
+                Hisame.SetTrigger("Title");
+            }
+
             // 初期状態: ビデオ未再生・UI操作有効.
             currentAnimeState = new stateAnimeloopStop();
             currentAnimeState.OnEnter(this);
@@ -193,6 +211,26 @@ namespace SceneEventer
             Debug.Log($"[StageSelect] 難易度:{difficulty} 条件:{condition} Enemy:{enemyName} → Tags:{SelectedTags} ({(int)SelectedTags})");
 
             // MainSceneInfo で敵生成を含むシーンをロード.
+            SceneManager.Instance().LoadMainScene(new MainSceneInfo()).Forget();
+        }
+
+        public void GameStartEasy()
+        {
+            // チュートリアルシーンを経由しない（直接ゲームシーンへ）.
+            PlayerPrefs.SetInt("TutorialMode", 0);
+
+            // Enemy名 → EnemyName enumへの変換.
+            EnemyName enemy = MissionTagToEnemyName(enemyName);
+            PlayerPrefs.SetInt("EnemyName", (int)enemy);
+
+            // 難易度を Difficulty_Easy に固定して MissionTags を保存.
+            MissionTag easyTags = MissionTag.Difficulty_Easy | condition | enemyName;
+            PlayerPrefs.SetInt(MissionTagsPrefsKey, (int)easyTags);
+            PlayerPrefs.Save();
+
+            Debug.Log($"[StageSelect] 難易度:Easy 条件:{condition} Enemy:{enemyName} → Tags:{easyTags} ({(int)easyTags})");
+
+            // ゲームシーンへ直接遷移（EnemyHP=1万、左側に操作一覧表示）.
             SceneManager.Instance().LoadMainScene(new MainSceneInfo()).Forget();
         }
 
@@ -267,6 +305,11 @@ namespace SceneEventer
             if (videoCanvasGroup != null) videoCanvasGroup.alpha = 1f;
             videoPlayer.gameObject.SetActive(true);
             videoPlayer.enabled = true;
+            videoPlayer.isLooping = false;
+            videoFinished = false;
+            // 二重登録防止のため先に解除してから登録.
+            videoPlayer.loopPointReached -= OnVideoLoopPointReached;
+            videoPlayer.loopPointReached += OnVideoLoopPointReached;
             videoPlayer.Play();
         }
 
@@ -301,6 +344,7 @@ namespace SceneEventer
             }
 
             // フェード完了後にビデオ停止 + 非表示.
+            videoPlayer.loopPointReached -= OnVideoLoopPointReached;
             videoPlayer.Stop();
             videoPlayer.enabled = false;
             videoPlayer.gameObject.SetActive(false);
@@ -337,6 +381,24 @@ namespace SceneEventer
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// ビデオ自然終了フラグを消費して返す.
+        /// </summary>
+        public bool ConsumeVideoFinished()
+        {
+            if (videoFinished)
+            {
+                videoFinished = false;
+                return true;
+            }
+            return false;
+        }
+
+        private void OnVideoLoopPointReached(VideoPlayer source)
+        {
+            videoFinished = true;
         }
 
         /// <summary>
@@ -399,6 +461,14 @@ namespace SceneEventer
                 next.OnEnter(eventer);
                 return next;
             }
+            // 動画が自然終了したらタイトルに戻る.
+            if (eventer.ConsumeVideoFinished())
+            {
+                eventer.StopInputMonitoring();
+                var next = new stateAnimeloopStop();
+                next.OnEnter(eventer);
+                return next;
+            }
             return this;
         }
     }
@@ -407,7 +477,7 @@ namespace SceneEventer
     {
         private float idleTimer = 0f;
         // 無入力タイムアウト秒数.
-        private const float idleTimeout = 10f;
+        private const float idleTimeout = 20f;
 
         public void OnEnter(TitleEventer eventer)
         {

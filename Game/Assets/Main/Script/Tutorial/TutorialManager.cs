@@ -36,25 +36,8 @@ namespace Tutorial
     public class TutorialManager : SingletonMonoBase<TutorialManager>
     {
         // ---- チュートリアル内容リスト ----
-        private readonly List<ITutorialContent> tutorials = new List<ITutorialContent>
-        {
-            new TutorialContent_Controls(),
-            new TutorialContent_Move(),
-            new TutorialContent_Jump(),
-            new TutorialContent_Dodge(),
-            new TutorialContent_WeakAttack(),
-            new TutorialContent_StrongAttack(),
-            new TutorialContent_Recovery(),
-            new TutorialContent_Parry(),
-            new TutorialContent_HeartRateRise(),
-            new TutorialContent_HeartRate200(),
-            new TutorialContent_HeartResist(),
-            new TutorialContent_HeartResistStrong(),
-            new TutorialContent_Iai(),
-            new TutorialContent_ChanceState(),
-            new TutorialContent_AbsorbGauge(),
-            new TutorialContent_HeartRateZero(),
-        };
+        // ExpandTutorials() が言語に応じて再構築するため空で初期化.
+        private readonly List<ITutorialContent> tutorials = new List<ITutorialContent>();
 
         private TutorialWindow view;
         private int currentIndex = 0;
@@ -64,7 +47,8 @@ namespace Tutorial
 
         // ---- 説明文分割 ----
         private const int maxLinesPerPage = 12;
-        private bool tutorialsExpanded = false;
+        // 最後に展開した言語（言語変更時に再展開するための比較用）.
+        private GameLanguage? _lastExpandedLanguage = null;
 
         // ---- ステートマシン ----
         private TutorialPhase currentPhase = TutorialPhase.Idle;
@@ -112,6 +96,10 @@ namespace Tutorial
         public void RegisterView(TutorialWindow tutorialWindow)
         {
             view = tutorialWindow;
+            // 新しいシーンのWindowが登録されたらチュートリアルシーン状態を安全にリセット.
+            // 次の StartTutorial() が呼ばれるまで不要な Update ループが走らないようにする.
+            isTutorialScene = false;
+            currentPhase = TutorialPhase.Idle;
             Debug.Log("[TutorialManager] View登録完了");
         }
 
@@ -225,15 +213,33 @@ namespace Tutorial
 
         /// <summary>
         /// 前のページへ戻る.
+        /// チュートリアルシーンでは同一チュートリアルの分割ページ内のみ戻れる.
         /// </summary>
         public void Prev()
         {
-            // チュートリアルシーンでは無効.
-            if (isTutorialScene) return;
+            if (isTutorialScene)
+            {
+                if (currentPhase != TutorialPhase.ShowingExplanation) return;
+                if (!CanGoBackInScene()) return;
+                currentIndex--;
+                currentPhase = TutorialPhase.Animating;
+                view.SlideTransitionAsync(tutorials[currentIndex], false).Forget();
+                return;
+            }
 
             if (IsFirst) return;
             currentIndex--;
             ShowCurrentAsync().Forget();
+        }
+
+        /// <summary>
+        /// チュートリアルシーンでの戻るボタン有効判定.
+        /// 直前のページが同一チュートリアルの分割ページである場合のみ戻れる.
+        /// </summary>
+        public bool CanGoBackInScene()
+        {
+            if (!isTutorialScene || currentIndex <= 0) return false;
+            return tutorials[currentIndex - 1].ContentId == tutorials[currentIndex].ContentId;
         }
 
         /// <summary>
@@ -310,7 +316,7 @@ namespace Tutorial
         }
 
         /// <summary>
-        /// チュートリアルを終了し、MainSceneInfo へ遷移する.
+        /// チュートリアルを終了し、タイトルへ戻る.
         /// </summary>
         public void EndTutorial()
         {
@@ -322,17 +328,10 @@ namespace Tutorial
 
             // チュートリアルモード解除.
             PlayerPrefs.SetInt("TutorialMode", 0);
-
-            // PlayerPrefs設定（TitleEventer.GameStartと同じ）.
-            PlayerPrefs.SetInt("EnemyName", (int)EnemyName.Wendigo);
-            MissionTag tags = MissionTag.Difficulty_Normal
-                            | MissionTag.Condition_BossNormal
-                            | MissionTag.Enemy_Wendigo;
-            PlayerPrefs.SetInt("MissionTags", (int)tags);
             PlayerPrefs.Save();
 
-            Debug.Log("[TutorialManager] EndTutorial → MainSceneInfo へ遷移");
-            SceneManager.Instance().LoadMainScene(new MainSceneInfo()).Forget();
+            Debug.Log("[TutorialManager] EndTutorial → TitleSceneInfo へ遷移");
+            SceneManager.Instance().LoadMainScene(new TitleSceneInfo()).Forget();
         }
 
         // ---- Update (ステートマシン) ----
@@ -577,13 +576,45 @@ namespace Tutorial
         // ---- 内部処理 ----
 
         /// <summary>
+        /// ベースとなるチュートリアルリストを生成する.
+        /// </summary>
+        private static List<ITutorialContent> CreateBaseTutorials()
+        {
+            return new List<ITutorialContent>
+            {
+                new TutorialContent_Controls(),
+                new TutorialContent_Move(),
+                new TutorialContent_Jump(),
+                new TutorialContent_Dodge(),
+                new TutorialContent_WeakAttack(),
+                new TutorialContent_StrongAttack(),
+                new TutorialContent_Recovery(),
+                new TutorialContent_Parry(),
+                new TutorialContent_HeartRateRise(),
+                new TutorialContent_HeartRate200(),
+                new TutorialContent_HeartResist(),
+                new TutorialContent_HeartResistStrong(),
+                new TutorialContent_Iai(),
+                new TutorialContent_ChanceCondition(),
+                new TutorialContent_ChanceState(),
+                new TutorialContent_AbsorbGauge(),
+                new TutorialContent_HeartRateZero(),
+            };
+        }
+
+        /// <summary>
         /// 説明文が maxLinesPerPage を超える ITutorialContent を複数ページに分割.
-        /// StartTutorial() 初回呼び出し時に1度だけ実行.
+        /// 言語が変わった場合は再実行する（分割結果が言語依存のため）.
         /// </summary>
         private void ExpandTutorials()
         {
-            if (tutorialsExpanded) return;
-            tutorialsExpanded = true;
+            var currentLang = Common.LanguageManager.Instance(false)?.CurrentLanguage ?? GameLanguage.Japanese;
+            if (_lastExpandedLanguage == currentLang) return;
+            _lastExpandedLanguage = currentLang;
+
+            // 言語に合わせてベースリストから再構築.
+            tutorials.Clear();
+            tutorials.AddRange(CreateBaseTutorials());
 
             var expanded = new List<ITutorialContent>();
             foreach (var content in tutorials)
@@ -624,10 +655,21 @@ namespace Tutorial
         {
             if (completionRateText == null) return;
 
+            bool isEN = Common.LanguageManager.Instance(false)?.CurrentLanguage == GameLanguage.English;
+
+            // イージーモード: 操作一覧のみ表示してリターン（シーン種別によらず共通）.
+            if (IsEasyMode())
+            {
+                completionRateText.text = isEN
+                    ? "Move : Left Stick\nJump : A\nDodge : LT·RT\nWeak Attack : X\nStrong Attack : Y\nRecovery : B\nHeart Resist : RB / LB"
+                    : "移動 : 左スティック\nジャンプ : A\n回避 : LT・RT\n弱攻撃 : X\n強攻撃 : Y\n回復 : B\n心拍数を抑える : RB / LB";
+                UpdatePercentBGSize();
+                return;
+            }
+
             int countableTotal = 0;
             foreach (var t in tutorials) { if (t.CountsForCompletion) countableTotal++; }
 
-            bool isEN = Common.LanguageManager.Instance(false)?.CurrentLanguage == GameLanguage.English;
             var text = isEN
                 ? $"Complete Tutorial ({completedCount}/{countableTotal})"
                 : $"チュートリアルを完了する ({completedCount}/{countableTotal})";
@@ -640,7 +682,7 @@ namespace Tutorial
                 if (!string.IsNullOrEmpty(content.OperationName))
                     text += $"\n{content.OperationName}{suffix}";
                 if (!string.IsNullOrEmpty(content.OperationKey))
-                    text += $"\n{content.OperationKey}{suffix}";
+                    text += $"\n{TutorialPSNotation.Filter(content.OperationKey)}{suffix}";
                 if (!string.IsNullOrEmpty(content.Supplement))
                     text += $"\n{content.Supplement}{suffix}";
 
@@ -655,11 +697,23 @@ namespace Tutorial
         }
 
         /// <summary>
+        /// イージー難易度で開始されたかどうかを PlayerPrefs から判定.
+        /// </summary>
+        private static bool IsEasyMode()
+        {
+            int tags = PlayerPrefs.GetInt("MissionTags", 0);
+            return ((MissionTag)tags & MissionTag.Difficulty_Easy) != 0;
+        }
+
+        /// <summary>
         /// 完了率UI（テキスト+BG画像）の表示/非表示を設定.
         /// 説明ウィンドウ表示中は非表示にする.
         /// </summary>
         private void SetCompletionRateVisible(bool visible)
         {
+            // イージーモードは操作一覧を常時表示するため非表示にしない.
+            if (!visible && IsEasyMode()) return;
+
             if (completionRateText != null)
                 completionRateText.gameObject.SetActive(visible);
             if (percentBGImage != null)

@@ -1,6 +1,7 @@
 using System.Threading;
 using Common;
 using Cysharp.Threading.Tasks;
+using InGame.Enemy;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -76,6 +77,11 @@ namespace Tutorial
         // 非同期ブリンク制御.
         private CancellationTokenSource blinkCts;
 
+        // ナビゲーションボタン（進む/戻る）表示フラグ.
+        // ShowContentAsync で true、HidePanel で false に切り替える.
+        // パネル非表示中（入力監視・初期待機）にボタンが露出するのを防ぐ.
+        private bool _navButtonsEnabled = false;
+
         // panelA は子から自動取得、panelB はランタイム複製.
         private TutorialWindowPanel panelA;
 
@@ -129,16 +135,18 @@ namespace Tutorial
 
 
             // PlayerPrefs に基づく UI 制御.
+            // チュートリアルモード or イージーモード(操作一覧表示)の場合に表示.
             bool isTutorialMode = PlayerPrefs.GetInt("TutorialMode", 0) == 1;
+            bool showControls = isTutorialMode || IsEasyMode();
 
             if (completionRateText != null)
-                completionRateText.gameObject.SetActive(isTutorialMode);
+                completionRateText.gameObject.SetActive(showControls);
             if (tutorialPercentBGImage != null)
-                tutorialPercentBGImage.gameObject.SetActive(isTutorialMode);
+                tutorialPercentBGImage.gameObject.SetActive(showControls);
 
-            // BackButton: チュートリアルシーン時は非表示.
-            if (isTutorialMode && backButton != null)
-                backButton.gameObject.SetActive(false);
+            // ナビゲーションボタンは初期非表示（ShowContentAsync / SlideTransitionAsync で有効化）.
+            if (backButton != null) backButton.gameObject.SetActive(false);
+            if (nextButton != null) nextButton.gameObject.SetActive(false);
 
             // Canvas幅をキャッシュ（スライドアニメーション用）.
             var canvasRect = GetComponent<RectTransform>();
@@ -190,6 +198,10 @@ namespace Tutorial
         /// </summary>
         public async UniTask ShowContentAsync(ITutorialContent content)
         {
+            // await の前に同期的に実行し、currentIndex が正しい状態で更新する.
+            // await より後に置くと並行呼び出し時に完了順が前後してボタン表示が交互になるバグが発生する.
+            _navButtonsEnabled = true;
+            UpdateButtonVisuals();
             activePanel?.Show();
             if (activePanel != null)
                 await activePanel.DisplayAsync(content);
@@ -201,6 +213,8 @@ namespace Tutorial
         public void HidePanel()
         {
             activePanel?.Hide();
+            _navButtonsEnabled = false;
+            UpdateButtonVisuals();
         }
 
         // ============================
@@ -244,11 +258,14 @@ namespace Tutorial
             }
 
             // 出現直後の入力残留を無視（一度ニュートラルに戻るまで受け付けない）.
+            // スティックが押されていれば早期リターン。ニュートラル時はフラグを解除して
+            // そのまま処理を継続する（同フレームの Submit を取りこぼさないため）.
             if (ignoreNavigateUntilRelease)
             {
                 if (Mathf.Abs(nav.x) < 0.1f)
                     ignoreNavigateUntilRelease = false;
-                return;
+                else
+                    return;
             }
 
             if (Time.unscaledTime - lastNavigateTime < navigateCooldown) return;
@@ -265,14 +282,20 @@ namespace Tutorial
             }
             else if (nav.x < -0.5f)
             {
-                lastNavigateTime = Time.unscaledTime;
-                SelectButton(0);
-                manager.Prev();
-                UpdateButtonVisuals();
+                // Back が無効（役割なし）の場合は左入力を無視.
+                if (backButton != null && !backButton.interactable) { /* ignore */ }
+                else
+                {
+                    lastNavigateTime = Time.unscaledTime;
+                    SelectButton(0);
+                    manager.Prev();
+                    UpdateButtonVisuals();
+                }
             }
 
-            // BackSpace → Back.
-            if (Keyboard.current != null && Keyboard.current.backspaceKey.wasPressedThisFrame)
+            // BackSpace → Back（Back が無効の場合は無視）.
+            if (Keyboard.current != null && Keyboard.current.backspaceKey.wasPressedThisFrame
+                && (backButton == null || backButton.interactable))
             {
                 lastNavigateTime = Time.unscaledTime;
                 SelectButton(0);
@@ -281,9 +304,11 @@ namespace Tutorial
             }
 
             // Submit → 現在選択中のボタン実行.
+            // Back が無効のときに selectedIndex==0 のままになっていても Next を実行.
             if (inputActions.UI.Submit.WasPressedThisFrame())
             {
-                if (selectedIndex == 0)
+                bool backEnabled = backButton != null && backButton.interactable;
+                if (selectedIndex == 0 && backEnabled)
                     OnBackClicked();
                 else
                     OnNextClicked();
@@ -338,28 +363,47 @@ namespace Tutorial
 
         /// <summary>
         /// ページ位置に応じてボタンの表示状態を更新.
+        /// 役割なし（チュートリアルシーン or 先頭ページ）: 文字を灰色にして背景を非表示.
+        /// 役割あり: 通常表示.
         /// </summary>
         private void UpdateButtonVisuals()
         {
             var manager = TutorialManager.Instance(false);
-            if (manager == null) return;
 
-            if (manager.IsTutorialScene)
+            // manager 未取得時はボタンを強制非表示にして終了.
+            if (manager == null)
             {
-                if (backButton != null)
-                    backButton.gameObject.SetActive(false);
+                if (backButton != null) backButton.gameObject.SetActive(false);
+                if (nextButton != null) nextButton.gameObject.SetActive(false);
+                return;
             }
-            else
+
+            // バックボタンの役割判定.
+            // チュートリアルシーンでは同一チュートリアルの分割ページ内のみ戻れる.
+            bool backEnabled = manager.IsTutorialScene
+                ? manager.CanGoBackInScene()
+                : !manager.IsFirst;
+
+            if (backButton != null)
             {
-                if (backButton != null)
-                {
-                    backButton.gameObject.SetActive(true);
-                    backButton.interactable = !manager.IsFirst;
-                }
+                backButton.interactable = backEnabled;
+                // _navButtonsEnabled かつ役割ありのときのみ表示.
+                backButton.gameObject.SetActive(_navButtonsEnabled && backEnabled);
+
+                // 背景画像（豆腐）: 常に非表示（文字のみで表示）.
+                var backImg = backButton.GetComponent<Image>();
+                if (backImg != null)
+                    backImg.enabled = false;
+
+                if (backButtonText != null)
+                    backButtonText.color = Color.white;
             }
 
             if (nextButton != null)
+            {
                 nextButton.interactable = true;
+                nextButton.gameObject.SetActive(_navButtonsEnabled);
+            }
         }
 
         // ============================
@@ -430,6 +474,16 @@ namespace Tutorial
             // TutorialManagerにアニメーション完了を通知.
             var manager = TutorialManager.Instance(false);
             manager?.OnSlideAnimationComplete();
+
+            // スライド後もボタン表示状態を更新（ShowContentAsync を経由しないため明示的に呼ぶ）.
+            _navButtonsEnabled = true;
+            UpdateButtonVisuals();
+        }
+
+        private static bool IsEasyMode()
+        {
+            int tags = PlayerPrefs.GetInt("MissionTags", 0);
+            return ((MissionTag)tags & MissionTag.Difficulty_Easy) != 0;
         }
 
         private static float EaseInOutCubic(float t)

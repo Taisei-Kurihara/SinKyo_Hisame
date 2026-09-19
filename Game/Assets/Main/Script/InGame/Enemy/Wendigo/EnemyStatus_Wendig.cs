@@ -35,7 +35,7 @@ public class EnemyStatus_Wendig : EnemyStatus_abstract
         float hpMultiplier = 1f;
         if ((missionTags & MissionTag.Difficulty_Easy) != 0)
         {
-            hpMultiplier = 0.6f;
+            hpMultiplier = 0.5f; // 20000 * 0.5 = 10000
         }
         else if ((missionTags & MissionTag.Difficulty_Hard) != 0)
         {

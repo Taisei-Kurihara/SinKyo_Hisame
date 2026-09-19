@@ -252,7 +252,13 @@ public class EnemState_Wendig_MeteorDrop : EnemState_abstract
         if (enemyModel?.Presenter != null)
         {
             enemyModel.Presenter.IsMeteorDropActive = false;
-            enemyModel.Presenter.SetBattleState(EnemyBattleState.Idle);
+            // MeteorDropStan が既に StunLong/StunShort をセットしている場合は上書きしない.
+            // （TriggerMeteorDropStan().Forget() との競合による StunLong 消去を防止）.
+            var cur = enemyModel.Presenter.BattleState;
+            if (cur != EnemyBattleState.StunLong && cur != EnemyBattleState.StunShort)
+            {
+                enemyModel.Presenter.SetBattleState(EnemyBattleState.Idle);
+            }
         }
 
         if (EnemNullSafetyHelper.IsValid(enemyModel))

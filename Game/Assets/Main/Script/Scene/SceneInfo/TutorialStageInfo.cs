@@ -1,6 +1,7 @@
 using Common;
 using Cysharp.Threading.Tasks;
 using InGame.Player;
+using Setting;
 using Tutorial;
 using UnityEngine;
 
@@ -27,10 +28,18 @@ namespace SceneInfo
             // チュートリアルを最初のページから開始（シーン遷移モード）.
             TutorialManager.Instance().StartTutorial(withSceneTransition: true);
 
+            // チュートリアルBGM再生.
+            await AudioManager.Instance().LoadBgm("BGM_チュートリアル");
+            AudioManager.Instance().SetBgmVolume(50);
+
             Debug.Log("[TutorialStageInfo] Init完了");
         }
 
-        UniTask ISceneInfo.End() => UniTask.CompletedTask;
+        UniTask ISceneInfo.End()
+        {
+            AudioManager.Instance()?.StopBgm();
+            return UniTask.CompletedTask;
+        }
 
         void ISceneInfo.InputStart()
         {

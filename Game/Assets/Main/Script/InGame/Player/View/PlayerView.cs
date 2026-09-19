@@ -2,6 +2,7 @@ using InGame.Player;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using System.Collections.Generic;
@@ -59,8 +60,22 @@ namespace InGame.Player
         [SerializeField] private float hpColorThresholdLow = 0.4f;
 
         [SerializeField] private CanvasGroup statusUI;
-        [SerializeField] private CanvasGroup win;
-        [SerializeField] private CanvasGroup lose;
+
+        [Header("必殺技演出")]
+        [SerializeField] private Animator Hisame;
+
+        [Header("勝利・敗北演出 動画")]
+        [SerializeField] private RawImage    resultVideoScreen;    // 動画表示 + 表示制御用
+        [SerializeField] private VideoPlayer resultVideoPlayer;
+
+        [SerializeField] private string winVideoAddress  = "Video_Win";
+        [SerializeField] private string loseVideoAddress = "Video_Lose";
+
+        private VideoClip winVideoClip;
+        private VideoClip loseVideoClip;
+        private AsyncOperationHandle<VideoClip> winVideoHandle;
+        private AsyncOperationHandle<VideoClip> loseVideoHandle;
+        private RenderTexture resultRenderTexture;
 
         [Header("OverlapTransparency マスク制御")]
         [SerializeField] private Material overlapSharedMaterial;
@@ -154,6 +169,10 @@ namespace InGame.Player
         /// <param name="heartRate">心拍数(0-200).</param>
         private void Start()
         {
+            // Hisame: 時間停止中でも再生できるよう UnscaledTime に設定.
+            if (Hisame != null)
+                Hisame.updateMode = AnimatorUpdateMode.UnscaledTime;
+
             // DPS表示を初期状態で無効化.
             if (dpsText != null)
             {
@@ -195,6 +214,22 @@ namespace InGame.Player
                 lm.OnLanguageChanged += OnHeartRateLabelLanguageChanged;
                 OnHeartRateLabelLanguageChanged(lm.CurrentLanguage);
             }
+
+            // 勝敗動画: RenderTexture を生成して VideoPlayer と RawImage に接続.
+            if (resultVideoPlayer != null && resultVideoScreen != null)
+            {
+                resultRenderTexture = new RenderTexture(1920, 1080, 0, RenderTextureFormat.ARGB32);
+                resultVideoPlayer.renderMode    = VideoRenderMode.RenderTexture;
+                resultVideoPlayer.targetTexture = resultRenderTexture;
+                resultVideoScreen.texture       = resultRenderTexture;
+                // 初期状態は非表示.
+                var sc = resultVideoScreen.color;
+                sc.a = 0f;
+                resultVideoScreen.color = sc;
+            }
+
+            // 勝敗動画クリップを Addressables からロード.
+            LoadResultVideosAsync().Forget();
         }
 
         private async UniTaskVoid LoadHeartbeatClipAsync()
@@ -229,6 +264,21 @@ namespace InGame.Player
             catch (Exception e)
             {
                 Debug.LogWarning($"[PlayerView] 心音クリップロード例外: {e.Message}");
+            }
+        }
+
+        private async UniTaskVoid LoadResultVideosAsync()
+        {
+            try
+            {
+                winVideoHandle  = Addressables.LoadAssetAsync<VideoClip>(winVideoAddress);
+                loseVideoHandle = Addressables.LoadAssetAsync<VideoClip>(loseVideoAddress);
+                winVideoClip  = await winVideoHandle;
+                loseVideoClip = await loseVideoHandle;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[PlayerView] 勝敗動画ロード例外: {e.Message}");
             }
         }
 
@@ -481,16 +531,66 @@ namespace InGame.Player
             if (statusUI != null) statusUI.alpha = alpha;
         }
 
-        // 勝利UIのalpha設定.
-        public void SetWinAlpha(float alpha)
+        // ---- 必殺技演出 ----
+
+        /// <summary>
+        /// 必殺技演出: "Hisatu" トリガーを発火し 25/60秒の時間停止を再生.
+        /// Hisame アニメーターは UnscaledTime で動作するため停止中でも再生される.
+        /// </summary>
+        public void PlayHisatu()
         {
-            if (win != null) win.alpha = alpha;
+            Hisame?.SetTrigger("Hisatu");
+            HisatuTimeStopAsync().Forget();
         }
 
-        // 敗北UIのalpha設定.
+        private async UniTaskVoid HisatuTimeStopAsync()
+        {
+            const float freezeDuration = 30f / 60f;
+            Time.timeScale = 0f;
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start < freezeDuration)
+                await UniTask.Yield(PlayerLoopTiming.Update);
+            Time.timeScale = 1f;
+        }
+
+        // 勝利演出: RawImage のアルファ制御 + 勝利動画の再生.
+        public void SetWinAlpha(float alpha)
+        {
+            if (resultVideoScreen == null) return;
+            var c = resultVideoScreen.color;
+            c.a = alpha;
+            resultVideoScreen.color = c;
+
+            if (resultVideoPlayer == null || winVideoClip == null || alpha <= 0f) return;
+            if (resultVideoPlayer.clip != winVideoClip)
+            {
+                resultVideoPlayer.clip = winVideoClip;
+                resultVideoPlayer.Play();
+            }
+            else if (!resultVideoPlayer.isPlaying)
+            {
+                resultVideoPlayer.Play();
+            }
+        }
+
+        // 敗北演出: RawImage のアルファ制御 + 敗北動画の再生.
         public void SetLoseAlpha(float alpha)
         {
-            if (lose != null) lose.alpha = alpha;
+            if (resultVideoScreen == null) return;
+            var c = resultVideoScreen.color;
+            c.a = alpha;
+            resultVideoScreen.color = c;
+
+            if (resultVideoPlayer == null || loseVideoClip == null || alpha <= 0f) return;
+            if (resultVideoPlayer.clip != loseVideoClip)
+            {
+                resultVideoPlayer.clip = loseVideoClip;
+                resultVideoPlayer.Play();
+            }
+            else if (!resultVideoPlayer.isPlaying)
+            {
+                resultVideoPlayer.Play();
+            }
         }
 
         // ---- OverlapTransparency マスク制御 ----
@@ -725,6 +825,20 @@ namespace InGame.Player
                 Addressables.Release(heartbeatSlowHandle);
             if (heartbeatFastHandle.IsValid())
                 Addressables.Release(heartbeatFastHandle);
+
+            // 勝敗動画クリップのハンドルを解放.
+            if (winVideoHandle.IsValid())
+                Addressables.Release(winVideoHandle);
+            if (loseVideoHandle.IsValid())
+                Addressables.Release(loseVideoHandle);
+
+            // RenderTexture を破棄.
+            if (resultRenderTexture != null)
+            {
+                resultRenderTexture.Release();
+                Destroy(resultRenderTexture);
+                resultRenderTexture = null;
+            }
 
             var lm = global::Common.LanguageManager.Instance(false);
             if (lm != null)

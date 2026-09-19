@@ -15,8 +15,23 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: a82726d5bec8d13408b0fad21b6def2d
   m_SerializeEntries:
+  - m_GUID: 010253f043a1a654685eed0d4f4b3c3e
+    m_Address: Tutorial_Recovery
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 0159a5ecbd32dab47888cad4061b1939
     m_Address: SE_IaiReady
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 14bb3bfb960760b4b931562ee9c3ad6c
+    m_Address: Tutorial_HeartResistStrong
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 1688d860b2aa13b4d8d8c19a14106195
+    m_Address: Tutorial_Move
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -30,6 +45,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 19c4adcc6453c6e40b9ef2555c10296d
+    m_Address: Tutorial_Parry
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 24407f76b26e88b4bb798c006127d2d0
     m_Address: SE_BerserkHowling
     m_ReadOnly: 0
@@ -37,6 +57,26 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 2725728b7b4a1944e886c8229d599a1a
     m_Address: DamageCounter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3335a245deb35704b95e487a83bd6987
+    m_Address: Tutorial_HeartResist
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 3462fb72ad772374c93f8da00234d9aa
+    m_Address: Tutorial_Iai
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 375b7edd5a710a6458610aa45b018da6
+    m_Address: Video_Win
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 426128ab682c63948b386a1b03b21064
+    m_Address: "BGM_\u30C1\u30E5\u30FC\u30C8\u30EA\u30A2\u30EB"
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -65,6 +105,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 640b622c0cef89c448d0579590646c89
+    m_Address: Tutorial_HeartRateRise
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 6501e14da1727bf478ee34a1620a2641
     m_Address: ChanceAttackSlash
     m_ReadOnly: 0
@@ -85,8 +130,23 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 7a8afadb90babd44ab5b138133a3f110
+    m_Address: Tutorial_StrongAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 80b0bab792c8e6149b5438d622e9b938
+    m_Address: Tutorial_WeakAttack
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: 85161dd3303e59e47920582a5c57bbf2
     m_Address: SE_AttackHit
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 86285742117128d49b192ca75c4a112f
+    m_Address: Tutorial_Dodge
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -95,8 +155,28 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 98ccba8e8070eab499eebf5c5ea2afd3
+    m_Address: "BGM_\u30BF\u30A4\u30C8\u30EB"
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9f9c471017e97a544aeb9971d9410d05
+    m_Address: Tutorial_Jump
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: a253451033c77a047b420a24efd62cc6
     m_Address: Down
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a523e186855164742bebcf5770e4c1d1
+    m_Address: SE_HealPointRestore
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: a5e7d5bf78b01084181ddd0b003a5601
+    m_Address: Tutorial_ChanceAttack
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -130,6 +210,11 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: bbcf96e2773e6e947adaefda52a21f2c
+    m_Address: Video_Lose
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: bf7fb13564ad23c448ba5a6f67f54846
     m_Address: UP
     m_ReadOnly: 0
@@ -142,6 +227,16 @@ MonoBehaviour:
     FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: c69caffcae62ceb40bdf6578ddcdab3d
     m_Address: BloodSplatter
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cd9a6755ec1e3d24983e02ec87071158
+    m_Address: Tutorial_HeartRate200
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: ced5755e86eb53f4c8a881d177469986
+    m_Address: SE_Title_Select
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
@@ -165,8 +260,18 @@ MonoBehaviour:
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e4ce39a8926f5534d8a7846c9e3d670f
+    m_Address: Tutorial_HeartRateZero
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: eed74201eb8749944a9d1b096072870a
     m_Address: SE_Heartbeat_Slow
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f1aaebe86e3f0bb48aad8f2462974923
+    m_Address: Tutorial_AbsorbGauge
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

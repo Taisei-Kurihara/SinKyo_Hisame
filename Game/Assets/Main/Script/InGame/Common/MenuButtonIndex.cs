@@ -1,5 +1,6 @@
 using System;
 using TMPro;
+using UnityEngine;
 using UnityEngine.UI;
 
 namespace InGame.Common
@@ -20,9 +21,10 @@ namespace InGame.Common
         Language = 6,
 
         // ---- タイトル画面専用 ----
-        TitleTutorial  = 7,  // チュートリアルボタン
-        TitleGameStart = 8,  // ゲーム開始ボタン
-        TitleGameQuit  = 9,  // ゲーム終了ボタン
+        TitleTutorial       = 7,  // チュートリアルボタン
+        TitleGameStartNormal = 8,  // ゲーム開始ボタン（ノーマル）
+        TitleGameQuit        = 9,  // ゲーム終了ボタン
+        TitleGameStartEasy   = 10, // ゲーム開始ボタン（イージー）
 
     }
 
@@ -60,6 +62,14 @@ namespace InGame.Common
         /// Inspector で設定するか、InitMenuButtonLabel() で自動取得する.
         /// </summary>
         public TextMeshProUGUI labelText;
+
+        /// <summary>
+        /// TextSlide アニメーション専用の移動対象 RectTransform.
+        /// Button 本体と分離した視覚テキスト用子オブジェクトを Inspector で設定する.
+        /// 設定されている場合はこちらを優先使用し、当たり判定 RT（Button 本体）は動かさない.
+        /// null の場合は labelText.rectTransform にフォールバック（同一 GO なら null 扱いで不動）.
+        /// </summary>
+        public RectTransform textSlideRT;
 
         /// <summary>
         /// labelText が未設定の場合、button 子オブジェクトから TextMeshProUGUI を自動取得する.

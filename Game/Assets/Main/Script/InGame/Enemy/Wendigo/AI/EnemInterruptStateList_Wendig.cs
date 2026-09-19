@@ -96,9 +96,14 @@ public class EnemInterruptStateList_Wendig
         currentInterruptState = state;
         Debug.Log($"[EnemInterruptStateList_Wendig] 割り込み実行 - StateType: {state.StateType}, Priority: {state.Priority}");
 
-        await state.Act(enemyModel);
-
-        currentInterruptState = null;
-        Debug.Log($"[EnemInterruptStateList_Wendig] 割り込み完了");
+        try
+        {
+            await state.Act(enemyModel);
+        }
+        finally
+        {
+            currentInterruptState = null;
+            Debug.Log($"[EnemInterruptStateList_Wendig] 割り込み完了");
+        }
     }
 }

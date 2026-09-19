@@ -1,5 +1,6 @@
 using Common;
 using Cysharp.Threading.Tasks;
+using Setting;
 using UnityEngine;
 
 namespace SceneInfo
@@ -11,7 +12,11 @@ namespace SceneInfo
     {
         string ISceneInfo.SceneName => "Title";
 
-        UniTask ISceneInfo.End() => UniTask.CompletedTask;
+        UniTask ISceneInfo.End()
+        {
+            AudioManager.Instance()?.StopBgm();
+            return UniTask.CompletedTask;
+        }
 
         async UniTask ISceneInfo.Init()
         {
@@ -23,6 +28,10 @@ namespace SceneInfo
             // フェードを事前ロード（初回シーン遷移時の遅延防止）.
             // バックグラウンドで実行し、完了前にボタンが押されても StartFadeIn が通常ロードで対応する.
             SceneManager.Instance().PrewarmFadeAsync().Forget();
+
+            // タイトルBGM再生（Addressablesキー: "BGM_タイトル"）.
+            await AudioManager.Instance().LoadBgm("BGM_タイトル");
+            AudioManager.Instance().SetBgmVolume(50);
         }
 
         void ISceneInfo.InputStart()

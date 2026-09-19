@@ -145,6 +145,9 @@ namespace InGame.Player
             // ガード/パリィSE初期化.
             InitializeGuardSE().Forget();
 
+            // 必殺技スラッシュエフェクトをプール初期化（スプライトロード + インスタンス事前生成）.
+            ChanceAttackSlashEffect.InitializePoolAsync().Forget();
+
             // Player死亡条件をSceneChangeStandに登録.
             RegisterPlayerDeathCondition();
 
@@ -765,9 +768,21 @@ namespace InGame.Player
 
             //回復残り回数
             compositeDisposePlayer.Add(
-            playerStatusModel.healPoint.Subscribe(_ => { 
-                view.SetHealPointCount(_); 
+            playerStatusModel.healPoint.Subscribe(_ => {
+                view.SetHealPointCount(_);
             }));
+
+            // 回復ポイント増加（吸収ゲージ3消費→回復ポイント変換）時にSE再生.
+            {
+                int prevHealPoint = playerStatusModel.healPoint.Value;
+                compositeDisposePlayer.Add(
+                    playerStatusModel.healPoint.Subscribe(newVal =>
+                    {
+                        if (newVal > prevHealPoint)
+                            guardSEPlayer?.Play("SE_HealPointRestore");
+                        prevHealPoint = newVal;
+                    }));
+            }
 
             //HP割合
             compositeDisposePlayer.Add(
@@ -869,7 +884,7 @@ namespace InGame.Player
         private async UniTaskVoid InitializeGuardSE()
         {
             guardSEPlayer = SEPlayer.Create("PlayerGuardSE");
-            await guardSEPlayer.LoadClipsAsync("SE_Parry", "SE_Stan", "SE_Heal", "SE_PlayerHurt", "SE_IaiReady");
+            await guardSEPlayer.LoadClipsAsync("SE_Parry", "SE_Stan", "SE_Heal", "SE_PlayerHurt", "SE_IaiReady", "SE_HealPointRestore");
         }
 
         /// <summary>
@@ -1186,6 +1201,9 @@ namespace InGame.Player
             isIaiActive = true;
             playerAnimation?.SetSuppressMovement(true);
             InGamePresenter.Instance.SetPlayerState(PlayerBattleState.ChanceAttack);
+
+            // 必殺技演出: "Hisatu" トリガー + 25/60秒 時間停止.
+            view.PlayHisatu();
 
             // 確定勝利の場合: 他の入力を即時無効化（必殺技完了まで不要）.
             if (isLethalChanceAttack)

@@ -1,8 +1,35 @@
+using System.Text.RegularExpressions;
 using UnityEngine;
 using InGame.Player;
 
 namespace Tutorial
 {
+    /// <summary>
+    /// チュートリアル PS ボタン表記の表示制御ユーティリティ.
+    /// </summary>
+    public static class TutorialPSNotation
+    {
+        /// <summary>
+        /// PS ボタン表記を表示するかどうか.
+        /// false（デフォルト）: "PS × / " 等のパターンを除去して Xbox・PC 表記のみ表示.
+        /// true : PS 表記を含む元の文字列をそのまま返す.
+        /// </summary>
+        public static bool ShowPSNotation = false;
+
+        // "PS [任意文字列] / " にマッチするパターン（スラッシュ・改行を含まない）.
+        private static readonly Regex _psPattern = new Regex(@"PS [^/\n]+ / ");
+
+        /// <summary>
+        /// ShowPSNotation フラグに従い "PS [xxx] / " パターンを除去して返す.
+        /// ShowPSNotation=true または null/空文字列の場合はそのまま返す.
+        /// </summary>
+        public static string Filter(string s)
+        {
+            if (ShowPSNotation || string.IsNullOrEmpty(s)) return s;
+            return _psPattern.Replace(s, "");
+        }
+    }
+
     // =====================================================
     // チュートリアル内容定義
     // 各クラスが ITutorialContent を実装し、
@@ -25,9 +52,12 @@ namespace Tutorial
         {
             "PS × / Xbox A / PC スペース で\n" +
             "ジャンプできます。\n\n" +
+            "空中でもう一度ジャンプすることで\n" +
+            "二段ジャンプが可能です。\n\n" +
             "ジャンプ中も攻撃・回避が可能です。",
 
             "Press PS × / Xbox A / PC Space to jump.\n\n" +
+            "You can jump again in mid-air\nfor a double jump.\n\n" +
             "You can attack and dodge while in the air.",
         };
         public string Description => _descs[L];
@@ -116,7 +146,7 @@ namespace Tutorial
             string c = L == 1 ? "(Done)" : "(完)";
             string leftComp  = leftDone  >= barSlots ? c : "";
             string rightComp = rightDone >= barSlots ? c : "";
-            return $"A [{leftBar}]{leftComp}\nD [{rightBar}]{rightComp}";
+            return $"右 [{rightBar}]{rightComp}\n左 [{leftBar}]{leftComp}";
         }
 
         public bool CheckCompletion(InputSystem_Actions inputActions)
@@ -575,7 +605,43 @@ namespace Tutorial
         }
     }
 
-    /// <summary>チャンス状態（必殺技）説明チュートリアル.</summary>
+    /// <summary>必殺技発動の条件チュートリアル.</summary>
+    public class TutorialContent_ChanceCondition : ITutorialContent
+    {
+        private static int L => (int)(Common.LanguageManager.Instance(false)?.CurrentLanguage ?? GameLanguage.Japanese);
+
+        public string ContentId => "chance_condition";
+
+        private static readonly string[] _titles = { "必殺発動の条件", "Special Attack: Conditions" };
+        public string Title => _titles[L];
+
+        private static readonly string[] _descs =
+        {
+            "敵の大技（連続落下）の発動中に\n" +
+            "居合攻撃を当てると、\n" +
+            "大技を中断してスタンさせます。\n\n" +
+            "このとき「チャンス状態」になり、\n" +
+            "一定時間内に通常攻撃ボタン\n" +
+            "（PS □ / Xbox X / PC J）を押すと\n" +
+            "必殺技が発動します。",
+
+            "During the enemy's big attack (Consecutive Meteor Drop),\nlanding an Iai strike interrupts it\nand stuns the enemy.\n\n" +
+            "This triggers a Chance State.\nPress the attack button\n(PS □ / Xbox X / PC J) within the time limit\nto unleash the special attack.",
+        };
+        public string Description => _descs[L];
+
+        public string VideoAddress => "Tutorial_ChanceAttack";
+        public string OperationName => "";
+        public string OperationKey => "";
+        public string Supplement => "";
+        public bool IsInformational => true;
+        public bool CountsForCompletion => true;
+        public string GetProgressBarText() => "";
+        public bool CheckCompletion(InputSystem_Actions inputActions) => false;
+        public void ResetMonitoring() { }
+    }
+
+    /// <summary>必殺技（チャンス）説明チュートリアル.</summary>
     public class TutorialContent_ChanceState : ITutorialContent
     {
         private static int L => (int)(Common.LanguageManager.Instance(false)?.CurrentLanguage ?? GameLanguage.Japanese);
@@ -587,13 +653,6 @@ namespace Tutorial
 
         private static readonly string[] _descs =
         {
-            "敵の大技（連続落下）の発動中に\n" +
-            "居合攻撃を当てると、\n" +
-            "大技を中断してスタンさせます。\n\n" +
-            "このとき「チャンス状態」になり、\n" +
-            "一定時間内に通常攻撃ボタン\n" +
-            "（PS □ / Xbox X / PC J）を押すと\n" +
-            "必殺技が発動します。\n\n" +
             "必殺技では9回の居合を連続で放ち、\n" +
             "大ダメージを与えます。\n\n" +
             "心拍数が低いほどダメージが上昇し、\n" +
@@ -601,15 +660,13 @@ namespace Tutorial
             "心拍数0: 5000まで上昇します。\n\n" +
             "必殺技発動後は心拍数が100に戻ります。",
 
-            "During an enemy's big attack (Consecutive Meteor Drop),\nlanding an Iai strike interrupts it\nand stuns the enemy.\n\n" +
-            "This starts a Chance State.\nPress the attack button\n(PS □ / Xbox X / PC J) within the time limit\nto unleash the special attack.\n\n" +
             "The special attack delivers 9 consecutive Iai strikes\nfor massive damage.\n\n" +
             "Lower heart rate increases damage:\nheart rate 100+: 2500,\nheart rate 0: up to 5000.\n\n" +
             "After the special attack, heart rate resets to 100.",
         };
         public string Description => _descs[L];
 
-        public string VideoAddress => "";
+        public string VideoAddress => "Tutorial_ChanceAttack";
         public string OperationName => "";
         public string OperationKey => "";
         public string Supplement => "";
@@ -750,7 +807,7 @@ namespace Tutorial
         };
         public string Description => _descs[L];
 
-        public string VideoAddress => "";
+        public string VideoAddress => "Tutorial_AbsorbGauge";
         public string OperationName => "";
         public string OperationKey => "";
         public string Supplement => "";

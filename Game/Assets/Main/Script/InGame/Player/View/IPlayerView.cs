@@ -27,5 +27,10 @@ namespace InGame.Player
         /// 与ダメージをDPS計測に記録.
         /// </summary>
         void RecordDamage(float damage);
+
+        /// <summary>
+        /// 必殺技演出: "Hisatu" トリガー発火 + 25/60秒 時間停止.
+        /// </summary>
+        void PlayHisatu();
     }
 }

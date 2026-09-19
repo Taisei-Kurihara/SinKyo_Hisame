@@ -41,32 +41,32 @@ namespace Common
 
         /// <summary>
         /// UI操作を無効化する（ビデオ再生中・シーン遷移中等）.
-        /// ブリンクを停止し、全ボタン色を白に戻す.
+        /// アニメーションを停止し、全ボタンを白に戻す.
         /// </summary>
         public void DisableEventer()
         {
             eventerEnable = false;
             isSubmitting = false;
-            CancelBlink();
-
-            // 全ボタン色をリセット（白 = UI元の色）.
-            SetAllButtonsColor(Color.white);
+            _buttonAnimator?.CancelSelectAnim();
+            _buttonAnimator?.DisableAll(buttons);
         }
 
         #endregion
 
-        #region ColorAnimation
+        #region Animation
 
-        // 非選択時の色.
-        private static readonly Color colorDeselected = new Color(0.8f, 0.8f, 0.8f, 0.8f);
-        // 選択時・ブリンクの明るい側.
-        private static readonly Color colorSelected = Color.white;
-        // ブリンクアニメーション1サイクルの片道時間(秒).
-        private const float blinkHalfDuration = 0.5f;
-        // --- 非同期ブリンクアニメーション制御 ---
-        private CancellationTokenSource blinkCts;
+        /// <summary>
+        /// ボタンアニメーション種別. Init() 内で設定する.
+        /// Awake で種別に応じたストラテジーを生成する.
+        /// </summary>
+        protected MenuButtonAnimatorType animatorType = MenuButtonAnimatorType.ColorBlink;
+
+        // アニメーションストラテジー本体.
+        private IMenuButtonAnimator _buttonAnimator;
+
         // R3購読の破棄用.
         private CompositeDisposable disposables = new CompositeDisposable();
+
         #endregion
 
         #region button列管理
@@ -105,6 +105,8 @@ namespace Common
 
         // Navigate入力が一度ニュートラルに戻るまで方向入力を受け付けないガード.
         private bool navigationReady = false;
+        // navigationReady を false にセットした時刻（時間経過による自動解除用）.
+        private float _navigationBlockedAt = 0f;
 
 
 
@@ -117,10 +119,11 @@ namespace Common
             currentIndex_y = initialIndex_y;
             currentIndex_x = initialIndex_x;
             navigationReady = false;
+            _navigationBlockedAt = Time.unscaledTime;
             isSubmitting = false;
 
-            CancelBlink();
-            SetAllButtonsColor(colorDeselected);
+            _buttonAnimator?.CancelSelectAnim();
+            _buttonAnimator?.ResetAll(buttons);
 
             if (buttons != null && buttons.Length > initialIndex_x
                 && buttons[initialIndex_x] != null && buttons[initialIndex_x].Length > initialIndex_y
@@ -143,12 +146,17 @@ namespace Common
             // InputSystem入力アクションを取得.
             action = InputSystemActionsManager.Instance().GetInputSystem_Actions();
 
-            // 継承先でボタン配列を設定.
+            // 継承先でボタン配列・animatorType を設定.
             Init();
 
             // 初期カーソル位置を反映（Init() 内で initialIndex_x/y を変更した場合に対応）.
             currentIndex_y = initialIndex_y;
             currentIndex_x = initialIndex_x;
+
+            // アニメーションストラテジーを生成（Init() で animatorType が確定した後）.
+            _buttonAnimator = animatorType == MenuButtonAnimatorType.TextSlide
+                ? (IMenuButtonAnimator)new MenuButtonTextSlideAnimator()
+                : new MenuButtonColorAnimator();
 
             // labelText が未設定のボタンを自動初期化（Inspector 未設定時のフォールバック）.
             if (buttons != null)
@@ -165,8 +173,8 @@ namespace Common
             // 起動時に現在の言語でラベルを即時適用（サブクラスの OnLanguageChanged を呼ぶ）.
             if (lm != null) OnLanguageChanged(lm.CurrentLanguage);
 
-            // 全ボタンを非選択色に初期化してから、初期カーソル位置のボタンを選択.
-            SetAllButtonsColor(colorDeselected);
+            // 全ボタンを非選択状態に初期化してから、初期カーソル位置のボタンを選択.
+            _buttonAnimator.ResetAll(buttons);
 
             if (buttons != null && buttons.Length > 0 && buttons[currentIndex_x] != null
                 && currentIndex_y < buttons[currentIndex_x].Length
@@ -177,6 +185,7 @@ namespace Common
 
             // シーン遷移直後の残留入力を弾くためクールダウンを初期化.
             lastNavigateTime = Time.unscaledTime;
+            _navigationBlockedAt = Time.unscaledTime;
 
             // ボタンSE初期化.
             InitMenuSEAsync().Forget();
@@ -187,6 +196,8 @@ namespace Common
                 foreach (var mb in row)
                 {
                     if (mb == null || mb.button == null) continue;
+                    // None インデックスは無効スロット扱い: イベント登録をスキップ.
+                    if (mb.index == MenuButtonIndex.None) continue;
                     if (!alreadyButtonEvent.Contains(mb))
                     {
                         alreadyButtonEvent.Add(mb);
@@ -197,7 +208,6 @@ namespace Common
                         mb.button.navigation = buttonNav;
 
                         // ButtonのTransitionによるImage.color上書きを防止.
-                        // 色制御は ImageColorAnimator で行うため Transition=None にする.
                         mb.button.transition = Selectable.Transition.None;
 
                         // Animatorが残っている場合は無効化（Image.colorを上書きするため）.
@@ -220,7 +230,8 @@ namespace Common
             submitAnimCts?.Cancel();
             submitAnimCts?.Dispose();
             submitAnimCts = null;
-            CancelBlink();
+            _buttonAnimator?.Dispose();
+            _buttonAnimator = null;
             disposables?.Dispose();
             if (menuSEPlayer != null)
             {
@@ -254,6 +265,10 @@ namespace Common
                 .Subscribe(_ =>
                 {
                     if (!eventerEnable) return;
+                    // Submit キー由来の onClick は CursolUpdate で処理済み.
+                    // コントローラー/キーボード Submit は EventSystem 経由で Button.onClick も発火するため
+                    // 二重発火を防ぐ（Immediate トグルが2回呼ばれて変化なしになるバグの対策）.
+                    if (action.UI.Submit.WasPressedThisFrame()) return;
                     var mode = buttonsSlot?.GetFireMode(target.index) ?? ButtonFireMode.AfterAnimation;
                     // Immediate: 連打時もアニメーション中断して再発火. それ以外: isSubmitting 中は無視.
                     if (!isSubmitting || mode == ButtonFireMode.Immediate)
@@ -266,8 +281,8 @@ namespace Common
 
         /// <summary>
         /// マウスホバー用EventTriggerを登録.
-        /// PointerEnter: ボタン選択（ブリンク開始）
-        /// PointerExit:  非選択色に戻す
+        /// PointerEnter: ボタン選択（アニメーション開始）
+        /// PointerExit:  非選択状態に戻す
         /// </summary>
         protected void AddHoverEvents(MenuButton target)
         {
@@ -302,9 +317,7 @@ namespace Common
             entryExit.eventID = EventTriggerType.PointerExit;
             entryExit.callback.AddListener((eventData) => {
                 if (!eventerEnable) return;
-                var img = target.button.GetComponent<Image>();
-                if (img != null)
-                    img.color = colorDeselected;
+                _buttonAnimator?.OnHoverExit(new MenuButtonAnimInfo(target));
             });
             trigger.triggers.Add(entryExit);
         }
@@ -326,10 +339,11 @@ namespace Common
 
             Vector2 nav = action.UI.Navigate.ReadValue<Vector2>();
 
-            // 初回ガード: Navigateが一度ニュートラルに戻るまで入力を無視.
+            // 初回ガード: Navigateがニュートラルに戻るか、0.5秒経過するまで入力を無視.
+            // ← スティック押しっぱなしのままシーン遷移/リセットされた場合の永久ブロックを防ぐ.
             if (!navigationReady)
             {
-                if (nav.sqrMagnitude < 0.25f)
+                if (nav.sqrMagnitude < 0.25f || Time.unscaledTime - _navigationBlockedAt >= 0.5f)
                     navigationReady = true;
                 return;
             }
@@ -339,27 +353,31 @@ namespace Common
             {
                 if (nav.y > 0.5f)
                 {
-                    currentIndex_y = (currentIndex_y - 1 + buttons[currentIndex_x].Length) % buttons[currentIndex_x].Length;
+                    // 上へ: None をスキップして有効ボタンへ.
+                    currentIndex_y = StepAndSkipNone(currentIndex_y, currentIndex_x, -1);
                     SelectButton(buttons[currentIndex_x][currentIndex_y]);
                     lastNavigateTime = Time.unscaledTime;
                 }
                 else if (nav.y < -0.5f)
                 {
-                    currentIndex_y = (currentIndex_y + 1) % buttons[currentIndex_x].Length;
+                    // 下へ: None をスキップして有効ボタンへ.
+                    currentIndex_y = StepAndSkipNone(currentIndex_y, currentIndex_x, +1);
                     SelectButton(buttons[currentIndex_x][currentIndex_y]);
                     lastNavigateTime = Time.unscaledTime;
                 }
                 else if (nav.x > 0.5f && buttons.Length > 1)
                 {
+                    // 右列へ: 移動先列で None に当たったら近傍の有効ボタンへ.
                     currentIndex_x = (currentIndex_x + 1) % buttons.Length;
-                    currentIndex_y = Mathf.Clamp(currentIndex_y, 0, buttons[currentIndex_x].Length - 1);
+                    currentIndex_y = FindNearestValidY(currentIndex_x, currentIndex_y);
                     SelectButton(buttons[currentIndex_x][currentIndex_y]);
                     lastNavigateTime = Time.unscaledTime;
                 }
                 else if (nav.x < -0.5f && buttons.Length > 1)
                 {
+                    // 左列へ: 同上.
                     currentIndex_x = (currentIndex_x - 1 + buttons.Length) % buttons.Length;
-                    currentIndex_y = Mathf.Clamp(currentIndex_y, 0, buttons[currentIndex_x].Length - 1);
+                    currentIndex_y = FindNearestValidY(currentIndex_x, currentIndex_y);
                     SelectButton(buttons[currentIndex_x][currentIndex_y]);
                     lastNavigateTime = Time.unscaledTime;
                 }
@@ -369,6 +387,8 @@ namespace Common
             if (action.UI.Submit.WasPressedThisFrame())
             {
                 var mb = buttons[currentIndex_x][currentIndex_y];
+                // None は無効スロット: 何もしない.
+                if (mb?.index == MenuButtonIndex.None) return;
                 var mode = buttonsSlot?.GetFireMode(mb.index) ?? ButtonFireMode.AfterAnimation;
                 if (!isSubmitting || mode == ButtonFireMode.Immediate)
                 {
@@ -378,18 +398,51 @@ namespace Common
             }
         }
 
+        /// <summary>
+        /// 現在 Y 位置から direction 方向に1歩進み、None をスキップして有効ボタンの Y インデックスを返す.
+        /// 全スロットが None の場合は現在位置のまま返す.
+        /// </summary>
+        private int StepAndSkipNone(int currentY, int colX, int direction)
+        {
+            var col = buttons[colX];
+            int len = col.Length;
+            int y = currentY;
+            for (int i = 0; i < len; i++)
+            {
+                y = (y + direction + len) % len;
+                if (col[y]?.index != MenuButtonIndex.None) return y;
+            }
+            return currentY;
+        }
+
+        /// <summary>
+        /// 列切り替え時に preferredY に最も近い有効（None でない）Y インデックスを返す.
+        /// 下方向・上方向の交互探索で最近傍を選ぶ.
+        /// </summary>
+        private int FindNearestValidY(int colX, int preferredY)
+        {
+            var col = buttons[colX];
+            int len = col.Length;
+            preferredY = Mathf.Clamp(preferredY, 0, len - 1);
+            if (col[preferredY]?.index != MenuButtonIndex.None) return preferredY;
+            for (int d = 1; d < len; d++)
+            {
+                int down = (preferredY + d) % len;
+                if (col[down]?.index != MenuButtonIndex.None) return down;
+                int up   = (preferredY - d + len) % len;
+                if (col[up]?.index != MenuButtonIndex.None) return up;
+            }
+            return preferredY;
+        }
+
         private void SelectButton(MenuButton menuButton)
         {
             if (menuButton == null || menuButton.button == null) return;
-            CancelBlink();
 
-            // 前のボタン → 非選択色.
-            if (previousButton != null && previousButton != menuButton)
-            {
-                var prevImg = previousButton.button.GetComponent<Image>();
-                if (prevImg != null)
-                    prevImg.color = colorDeselected;
-            }
+            var newInfo  = new MenuButtonAnimInfo(menuButton);
+            MenuButtonAnimInfo? prevInfo = (previousButton != null && previousButton != menuButton)
+                ? new MenuButtonAnimInfo(previousButton)
+                : (MenuButtonAnimInfo?)null;
 
             // EventSystem上で選択状態に設定.
             if (EventSystem.current != null)
@@ -399,31 +452,15 @@ namespace Common
             // 現在のボタンを記録.
             previousButton = menuButton;
 
-            // ブリンクアニメーション開始.
-            StartBlink(menuButton);
+            // アニメーションストラテジーに委譲.
+            _buttonAnimator?.StartSelectAnim(newInfo, prevInfo);
 
             // SE等のコールバック.
             OnButtonSelected(menuButton);
         }
 
-        private void StartBlink(MenuButton menuButton)
-        {
-            CancelBlink();
-            var img = menuButton.button.GetComponent<Image>();
-            if (img == null) return;
-            blinkCts = new CancellationTokenSource();
-            ImageColorAnimator.BlinkLoopAsync(img, colorSelected, colorDeselected, blinkHalfDuration, blinkCts.Token).Forget();
-        }
-
-        private void CancelBlink()
-        {
-            blinkCts?.Cancel();
-            blinkCts?.Dispose();
-            blinkCts = null;
-        }
-
         /// <summary>
-        /// ボタン決定処理. ブリンク1サイクル再生後にbuttonsSlotのアクションを発火.
+        /// ボタン決定処理. アニメーション再生後または途中で buttonsSlot のアクションを発火.
         /// </summary>
         private void SubmitButton(MenuButton menuButton)
         {
@@ -435,13 +472,13 @@ namespace Common
 
             isSubmitting = true;
             menuSEPlayer?.Play("SE_Button");
-            CancelBlink();
+            _buttonAnimator?.CancelSelectAnim();
             RunSubmitAnimAsync(menuButton, submitAnimCts.Token, myId).Forget();
         }
 
         private async UniTaskVoid RunSubmitAnimAsync(MenuButton menuButton, CancellationToken submitToken, int animId)
         {
-            var img = menuButton.button.GetComponent<Image>();
+            var info     = new MenuButtonAnimInfo(menuButton);
             var fireMode = buttonsSlot?.GetFireMode(menuButton.index) ?? ButtonFireMode.AfterAnimation;
 
             // Submit キャンセル + オブジェクト破棄 の両方で中断できるようリンク.
@@ -455,30 +492,20 @@ namespace Common
                 {
                     // 即時発火してからアニメーション（連打でキャンセル・再発火可）.
                     buttonsSlot?.InvokeByKey(menuButton.index);
-                    if (img != null)
-                        await ImageColorAnimator.BlinkOnceAsync(img, colorSelected, colorDeselected, blinkHalfDuration, token);
+                    await _buttonAnimator.PlaySubmitAnimAsync(info, token);
                 }
                 else if (fireMode == ButtonFireMode.EarlyFire)
                 {
-                    // アニメーション開始と並走し、0.33 倍経過時点で発火（シーン移動系）.
-                    float earlyDelay = blinkHalfDuration * 2f * 0.33f;
-                    if (img != null)
-                    {
-                        var animTask = ImageColorAnimator.BlinkOnceAsync(img, colorSelected, colorDeselected, blinkHalfDuration, token);
-                        await UniTask.Delay(TimeSpan.FromSeconds(earlyDelay), ignoreTimeScale: true, cancellationToken: token);
-                        buttonsSlot?.InvokeByKey(menuButton.index);
-                        await animTask;
-                    }
-                    else
-                    {
-                        await UniTask.Delay(TimeSpan.FromSeconds(earlyDelay), ignoreTimeScale: true, cancellationToken: token);
-                        buttonsSlot?.InvokeByKey(menuButton.index);
-                    }
+                    // アニメーション開始と並走し、GetSubmitEarlyFireDelay() 秒経過時点で発火（シーン移動系）.
+                    float earlyDelay = _buttonAnimator.GetSubmitEarlyFireDelay();
+                    var animTask = _buttonAnimator.PlaySubmitAnimAsync(info, token);
+                    await UniTask.Delay(TimeSpan.FromSeconds(earlyDelay), ignoreTimeScale: true, cancellationToken: token);
+                    buttonsSlot?.InvokeByKey(menuButton.index);
+                    await animTask;
                 }
                 else // AfterAnimation（デフォルト）
                 {
-                    if (img != null)
-                        await ImageColorAnimator.BlinkOnceAsync(img, colorSelected, colorDeselected, blinkHalfDuration, token);
+                    await _buttonAnimator.PlaySubmitAnimAsync(info, token);
                     buttonsSlot?.InvokeByKey(menuButton.index);
                 }
             }
@@ -488,24 +515,6 @@ namespace Common
                 // 最新世代のアニメーションのみ isSubmitting をリセット.
                 if (submitAnimId == animId)
                     isSubmitting = false;
-            }
-        }
-
-        /// <summary>
-        /// 全ボタンのImage.colorを指定色に設定.
-        /// </summary>
-        private void SetAllButtonsColor(Color color)
-        {
-            if (buttons == null) return;
-            foreach (var row in buttons)
-            {
-                if (row == null) continue;
-                foreach (var mb in row)
-                {
-                    if (mb == null || mb.button == null) continue;
-                    var img = mb.button.GetComponent<Image>();
-                    if (img != null) img.color = color;
-                }
             }
         }
     }
@@ -576,7 +585,7 @@ public enum ButtonFireMode
 {
     AfterAnimation, // アニメーション完了後に発火（デフォルト）.
     Immediate,      // 即時発火（メニュー開閉・トグル系）. 連打でアニメーション中断・再発火.
-    EarlyFire,      // アニメーション開始から 0.33 倍経過時点で発火（シーン移動系）.
+    EarlyFire,      // アニメーション開始から GetSubmitEarlyFireDelay() 秒経過時点で発火（シーン移動系）.
 }
 
 // ============================================================
